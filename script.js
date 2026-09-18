@@ -162,7 +162,7 @@ const game = {
   endlessTransitioning: false,
   // Kept around for future competitive features (best room / best score /
   // fastest clear / leaderboards). Only tracked in memory for now.
-  endlessBest: { room: null, score: null },
+  endlessBest: { room: null, score: null, time: null },
 
   lastTimestamp: 0
 };
@@ -1958,9 +1958,11 @@ function endEndlessRoom(victory) {
   const reachedRoom = game.endlessRoom;
   const isNewBestRoom = game.endlessBest.room === null || reachedRoom > game.endlessBest.room;
   const isNewBestScore = game.endlessBest.score === null || game.endlessScore > game.endlessBest.score;
+  const isNewBestTime = game.endlessBest.time === null || game.runTime > game.endlessBest.time;
   if (isNewBestRoom) game.endlessBest.room = reachedRoom;
   if (isNewBestScore) game.endlessBest.score = game.endlessScore;
-  if ((isNewBestRoom || isNewBestScore) && typeof Account !== 'undefined') Account.syncProgress();
+  if (isNewBestTime) game.endlessBest.time = game.runTime;
+  if ((isNewBestRoom || isNewBestScore || isNewBestTime) && typeof Account !== 'undefined') Account.syncProgress();
 
   ui.endlessOverRoom.textContent = `${reachedRoom}`;
   ui.endlessOverScore.textContent = game.endlessScore.toLocaleString();

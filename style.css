@@ -23,6 +23,10 @@
   padding: 0;
 }
 
+.hidden {
+  display: none !important;
+}
+
 html, body {
   height: 100%;
   background: var(--bg);
@@ -985,6 +989,13 @@ body {
   max-width: 340px;
 }
 
+#account-guest-view {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+}
+
 .auth-tabs {
   display: flex;
   gap: 6px;
@@ -1092,4 +1103,120 @@ body {
 .account-stat-row span:last-child {
   color: var(--text);
   font-weight: 700;
+}
+
+/* ---- Profile view (logged in): header + stat cards ---- */
+
+#account-profile-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+}
+
+.profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.profile-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--bg);
+  background: var(--player);
+  box-shadow: 0 0 24px var(--player-glow);
+}
+
+.profile-username {
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+
+.stats-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.stats-heading {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px 6px;
+  border-radius: 6px;
+  border: 1.5px solid var(--wall-border);
+  background: rgba(16, 22, 31, 0.7);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.stat-card:hover {
+  border-color: var(--player);
+  box-shadow: 0 0 16px var(--player-glow);
+}
+
+.stat-card-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+.stat-card-value {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  text-align: center;
+  word-break: break-word;
+}
+
+.logout-link {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  padding: 4px 8px;
+  transition: color 0.15s ease;
+}
+
+.logout-link:hover {
+  color: var(--fail);
 }

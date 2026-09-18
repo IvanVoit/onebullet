@@ -249,29 +249,60 @@
             <button type="button" class="auth-tab" data-tab="signup">SIGN UP</button>
           </div>
 
-          <form id="auth-form" class="auth-form">
-            <input type="text" id="auth-username" class="auth-input hidden" placeholder="USERNAME" autocomplete="username">
-            <input type="email" id="auth-email" class="auth-input" placeholder="EMAIL" autocomplete="email" required>
-            <input type="password" id="auth-password" class="auth-input" placeholder="PASSWORD" autocomplete="current-password" required minlength="6">
+          <form id="auth-form" class="auth-form" autocomplete="off">
+            <input type="text" id="auth-username" class="auth-input" placeholder="USERNAME" autocomplete="username">
+            <input type="email" id="auth-email" class="auth-input hidden" placeholder="EMAIL" autocomplete="email">
+            <input type="password" id="auth-password" class="auth-input" placeholder="PASSWORD" autocomplete="new-password" required minlength="6">
+            <input type="password" id="auth-password-confirm" class="auth-input hidden" placeholder="CONFIRM PASSWORD" autocomplete="new-password" minlength="6">
             <p id="auth-error" class="auth-error hidden"></p>
             <button type="submit" id="auth-submit" class="btn btn-primary">LOG IN</button>
           </form>
-
-          <button id="btn-account-guest" class="btn btn-ghost">CONTINUE AS GUEST</button>
         </div>
 
         <!-- Logged-in: profile + saved stats -->
         <div id="account-profile-view" class="hidden">
-          <p class="subtitle" id="account-email">you@example.com</p>
-
-          <div class="account-stats">
-            <div class="account-stat-row"><span>EASY BEST</span><span id="stat-easy">--</span></div>
-            <div class="account-stat-row"><span>MEDIUM BEST</span><span id="stat-medium">--</span></div>
-            <div class="account-stat-row"><span>HARD BEST</span><span id="stat-hard">--</span></div>
-            <div class="account-stat-row"><span>ENDLESS BEST</span><span id="stat-endless">--</span></div>
+          <div class="profile-header">
+            <div class="profile-avatar" id="profile-avatar">?</div>
+            <div class="profile-username" id="profile-username">USERNAME</div>
           </div>
 
-          <button id="btn-account-logout" class="btn btn-ghost">LOG OUT</button>
+          <div class="stats-section">
+            <h3 class="stats-heading">OFFICIAL LEVELS</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">EASY</span>
+                <span class="stat-card-value" id="stat-easy">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">MEDIUM</span>
+                <span class="stat-card-value" id="stat-medium">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">HARD</span>
+                <span class="stat-card-value" id="stat-hard">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">ENDLESS MODE</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">BEST TIME</span>
+                <span class="stat-card-value" id="stat-endless-time">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">BEST SCORE</span>
+                <span class="stat-card-value" id="stat-endless-score">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">BEST ROOM</span>
+                <span class="stat-card-value" id="stat-endless-room">--</span>
+              </div>
+            </div>
+          </div>
+
+          <button id="btn-account-logout" class="logout-link">LOG OUT</button>
         </div>
 
         <button id="btn-account-back" class="btn btn-ghost">BACK</button>

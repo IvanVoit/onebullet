@@ -3,13 +3,16 @@
    ------------------------------------------------------------------
    Handles the account system: sign up / log in / log out through
    Supabase Auth, and syncing progress (best times per difficulty +
-   endless best) to a "profiles" table so it follows the player across
+   endless bests) to a "profiles" table so it follows the player across
    devices. Falls back to localStorage for guests who skip login.
 
+   Login/signup happen by USERNAME. Supabase Auth itself is still
+   email + password under the hood, so signup also collects an email
+   (kept private, never shown as the primary identity), and logging in
+   looks up the email tied to that username via a database function
+   before handing it to Supabase Auth. See the setup guide for the SQL.
+
    Loaded BEFORE script.js. Exposes a single global: `Account`.
-   `game` (defined in script.js) is read/written here once script.js
-   has run its init(), which is the only place these functions get
-   called from.
    ====================================================================== */
 
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -56,7 +59,7 @@ const Account = {
     const label = document.getElementById('account-chip-label');
     if (!label) return;
     if (this.user) {
-      const name = (this.profile && this.profile.username) || this.user.email.split('@')[0];
+      const name = (this.profile && this.profile.username) || 'PLAYER';
       label.textContent = name.toUpperCase();
     } else {
       label.textContent = 'GUEST';
@@ -90,6 +93,9 @@ const Account = {
     if (data.endless_best_score !== null && data.endless_best_score !== undefined) {
       game.endlessBest.score = data.endless_best_score;
     }
+    if (data.endless_best_time !== null && data.endless_best_time !== undefined) {
+      game.endlessBest.time = data.endless_best_time;
+    }
   },
 
   // Push current in-memory bests up to Supabase (or localStorage as a
@@ -106,6 +112,7 @@ const Account = {
       best_times: game.bestTimes,
       endless_best_room: game.endlessBest.room,
       endless_best_score: game.endlessBest.score,
+      endless_best_time: game.endlessBest.time,
       updated_at: new Date().toISOString()
     };
 
@@ -138,7 +145,14 @@ const Account = {
 
   /* ---------------- auth actions ---------------- */
 
-  async signUp(email, password, username) {
+  // username-based signup. Still needs an email under the hood (Supabase
+  // Auth requirement) but the player never logs in with it again.
+  async signUp(username, email, password) {
+    const { data: available, error: availError } = await supabaseClient
+      .rpc('is_username_available', { uname: username });
+    if (availError) throw availError;
+    if (!available) throw new Error('That username is already taken.');
+
     const { data, error } = await supabaseClient.auth.signUp({
       email,
       password,
@@ -157,9 +171,17 @@ const Account = {
     return data;
   },
 
-  async signIn(email, password) {
+  // username-based login: resolve the account's email server-side, then
+  // hand it to Supabase Auth like a normal email/password sign-in.
+  async signIn(username, password) {
+    const { data: email, error: lookupError } = await supabaseClient
+      .rpc('get_email_by_username', { uname: username });
+    if (lookupError) throw lookupError;
+    if (!email) throw new Error('Incorrect username or password.');
+
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    if (error) throw new Error('Incorrect username or password.');
+
     this.user = data.user;
     await this.loadProfile();
     return data;
@@ -200,12 +222,13 @@ function setupAccountUI() {
   const usernameInput = document.getElementById('auth-username');
   const emailInput = document.getElementById('auth-email');
   const passwordInput = document.getElementById('auth-password');
+  const passwordConfirmInput = document.getElementById('auth-password-confirm');
   const errorEl = document.getElementById('auth-error');
   const submitBtn = document.getElementById('auth-submit');
-  const accountEmail = document.getElementById('account-email');
   const btnBack = document.getElementById('btn-account-back');
-  const btnGuest = document.getElementById('btn-account-guest');
   const btnLogout = document.getElementById('btn-account-logout');
+  const profileAvatar = document.getElementById('profile-avatar');
+  const profileUsername = document.getElementById('profile-username');
 
   function showError(msg) {
     errorEl.textContent = msg;
@@ -217,12 +240,28 @@ function setupAccountUI() {
     errorEl.textContent = '';
   }
 
-  function refreshAccountScreen() {
+  function resetForm() {
+    form.reset();
     clearError();
+  }
+
+  function applyTabFields() {
+    const isSignup = Account.mode === 'signup';
+    emailInput.classList.toggle('hidden', !isSignup);
+    emailInput.required = isSignup;
+    passwordConfirmInput.classList.toggle('hidden', !isSignup);
+    passwordConfirmInput.required = isSignup;
+    submitBtn.textContent = isSignup ? 'SIGN UP' : 'LOG IN';
+  }
+
+  function refreshAccountScreen() {
     if (Account.user) {
       guestView.classList.add('hidden');
       profileView.classList.remove('hidden');
-      accountEmail.textContent = Account.user.email;
+
+      const name = (Account.profile && Account.profile.username) || 'PLAYER';
+      profileUsername.textContent = name.toUpperCase();
+      profileAvatar.textContent = name.charAt(0).toUpperCase();
 
       document.getElementById('stat-easy').textContent =
         game.bestTimes.easy !== undefined ? formatTime(game.bestTimes.easy) : '--';
@@ -230,14 +269,19 @@ function setupAccountUI() {
         game.bestTimes.medium !== undefined ? formatTime(game.bestTimes.medium) : '--';
       document.getElementById('stat-hard').textContent =
         game.bestTimes.hard !== undefined ? formatTime(game.bestTimes.hard) : '--';
-      document.getElementById('stat-endless').textContent =
-        game.endlessBest.score !== null
-          ? `ROOM ${game.endlessBest.room} \u00b7 ${game.endlessBest.score.toLocaleString()}`
-          : '--';
+
+      document.getElementById('stat-endless-time').textContent =
+        game.endlessBest.time !== null && game.endlessBest.time !== undefined
+          ? formatTime(game.endlessBest.time) : '--';
+      document.getElementById('stat-endless-score').textContent =
+        game.endlessBest.score !== null ? game.endlessBest.score.toLocaleString() : '--';
+      document.getElementById('stat-endless-room').textContent =
+        game.endlessBest.room !== null ? game.endlessBest.room : '--';
     } else {
       guestView.classList.remove('hidden');
       profileView.classList.add('hidden');
-      form.reset();
+      resetForm();
+      applyTabFields();
     }
   }
 
@@ -250,7 +294,6 @@ function setupAccountUI() {
   });
 
   btnBack.addEventListener('click', () => showScreen(screenMenu));
-  btnGuest.addEventListener('click', () => showScreen(screenMenu));
 
   btnLogout.addEventListener('click', async () => {
     await Account.signOut();
@@ -262,9 +305,8 @@ function setupAccountUI() {
       tabs.forEach((t) => t.classList.remove('active'));
       tab.classList.add('active');
       Account.mode = tab.dataset.tab;
-      usernameInput.classList.toggle('hidden', Account.mode !== 'signup');
-      submitBtn.textContent = Account.mode === 'signup' ? 'SIGN UP' : 'LOG IN';
-      clearError();
+      resetForm();
+      applyTabFields();
     });
   });
 
@@ -272,25 +314,39 @@ function setupAccountUI() {
     e.preventDefault();
     clearError();
 
+    const username = usernameInput.value.trim();
     const email = emailInput.value.trim();
     const password = passwordInput.value;
-    const username = usernameInput.value.trim();
+    const passwordConfirm = passwordConfirmInput.value;
+
+    if (!username) {
+      showError('Enter a username.');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+      showError('Username must be 3-20 characters: letters, numbers, underscores.');
+      return;
+    }
 
     submitBtn.disabled = true;
     try {
       if (Account.mode === 'signup') {
-        if (!username) {
-          showError('Pick a username.');
+        if (!email) {
+          showError("Enter an email - it's only used to recover your account.");
           return;
         }
-        const result = await Account.signUp(email, password, username);
+        if (password !== passwordConfirm) {
+          showError("Passwords don't match.");
+          return;
+        }
+        const result = await Account.signUp(username, email, password);
         if (!result.session) {
           showError('Account created. Check your email to confirm it, then log in.');
           tabs[0].click();
           return;
         }
       } else {
-        await Account.signIn(email, password);
+        await Account.signIn(username, password);
       }
       Account.updateChip();
       refreshAccountScreen();
@@ -300,4 +356,6 @@ function setupAccountUI() {
       submitBtn.disabled = false;
     }
   });
+
+  applyTabFields();
 }
