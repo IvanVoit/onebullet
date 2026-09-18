@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ONE BULLET</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="game-wrapper">
+
+    <canvas id="game-canvas" width="960" height="600"></canvas>
+
+    <!-- ============ HUD (in-game) ============ -->
+    <div id="hud" class="hidden">
+      <div class="hud-chip" id="hud-room-chip">
+        <span class="hud-label">ROOM</span>
+        <span id="hud-room">1 / 10</span>
+      </div>
+      <div class="hud-chip" id="hud-run-chip">
+        <span class="hud-label" id="hud-run-label">TIME</span>
+        <span id="hud-run-time">0.00s</span>
+      </div>
+      <div class="hud-chip is-hidden" id="hud-score-chip">
+        <span class="hud-label">SCORE</span>
+        <span id="hud-score">0</span>
+      </div>
+      <div class="hud-chip" id="hud-enemies-chip">
+        <span class="hud-label">ENEMIES</span>
+        <span id="hud-enemies">3</span>
+      </div>
+      <div class="hud-chip" id="hud-bullet-chip">
+        <span class="hud-label">BULLET</span>
+        <span id="hud-bullet">READY</span>
+      </div>
+
+      <!-- Neon hamburger (3 straight lines) -->
+      <button id="btn-menu" class="pause-btn" aria-label="Menu">
+        <svg viewBox="0 0 32 32" width="22" height="22" aria-hidden="true">
+          <line x1="6" y1="10" x2="26" y2="10" />
+          <line x1="6" y1="16" x2="26" y2="16" />
+          <line x1="6" y1="22" x2="26" y2="22" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- ============ Big in-flight bullet countdown ============ -->
+    <div id="timer-display" class="timer-display hidden">
+      <span id="timer-value">5.0</span>
+    </div>
+
+    <!-- ============ MAIN MENU ============ -->
+    <div id="screen-menu" class="screen">
+      <div class="menu-inner">
+        <h1 class="title">ONE BULLET</h1>
+        <p class="subtitle">One shot. No mistakes.</p>
+
+        <div class="menu-dial">
+          <button id="btn-settings" class="dial-btn dial-side dial-settings" aria-label="Settings" title="Settings">
+            <span class="dial-glyph">&#9881;</span>
+          </button>
+
+          <button id="btn-play" class="dial-btn dial-play" aria-label="Play">
+            <span class="dial-glyph dial-glyph-play">&#9654;</span>
+          </button>
+
+          <button id="btn-endless" class="dial-btn dial-side dial-endless" aria-label="Endless mode" title="Endless">
+            <span class="dial-glyph">&#8734;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ SETTINGS ============ -->
+    <div id="screen-settings" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="section-title">SETTINGS</h2>
+
+        <div class="pause-list">
+          <button id="btn-open-controls" class="pause-row pause-level">
+            <span class="pause-glyph">&#8996;</span>
+            <span class="pause-text">
+              <span class="pause-name">CONTROLS</span>
+              <span class="pause-desc">Remap movement and hotkeys</span>
+            </span>
+          </button>
+
+          <button id="btn-open-howtoplay" class="pause-row pause-run">
+            <span class="pause-glyph">?</span>
+            <span class="pause-text">
+              <span class="pause-name">HOW TO PLAY</span>
+              <span class="pause-desc">The rules, in plain language</span>
+            </span>
+          </button>
+        </div>
+
+        <button id="btn-settings-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ CONTROLS (remap keys) ============ -->
+    <div id="screen-controls" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="section-title">CONTROLS</h2>
+
+        <div class="bind-list">
+          <div class="bind-row">
+            <span class="bind-label">MOVE UP</span>
+            <button class="bind-key" data-action="up">W</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">MOVE DOWN</span>
+            <button class="bind-key" data-action="down">S</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">MOVE LEFT</span>
+            <button class="bind-key" data-action="left">A</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">MOVE RIGHT</span>
+            <button class="bind-key" data-action="right">D</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">RETRY / RESTART</span>
+            <button class="bind-key" data-action="retry">R</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">NEXT ROOM</span>
+            <button class="bind-key" data-action="next">SPACE</button>
+          </div>
+          <div class="bind-row">
+            <span class="bind-label">PAUSE MENU</span>
+            <button class="bind-key" data-action="pause">ESC</button>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-controls-reset" class="btn btn-ghost">RESET DEFAULTS</button>
+          <button id="btn-controls-back" class="btn btn-primary">BACK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ HOW TO PLAY ============ -->
+    <div id="screen-howtoplay" class="screen hidden">
+      <div class="menu-inner htp-inner">
+        <h2 class="section-title">HOW TO PLAY</h2>
+
+        <div class="htp-text">
+          <p>You get exactly <strong>one bullet</strong>. Aim with your mouse &mdash; a dotted line shows roughly where it will bounce off the walls.</p>
+          <p><strong>Left-click to fire.</strong> The bullet travels fast, ricochets off walls, and keeps flying after it kills an enemy. Clear every enemy in the room with that single shot to win it.</p>
+          <p><strong>NORMAL RUN</strong> &mdash; clear all 10 rooms back to back. One miss sends you all the way back to room 1.</p>
+          <p><strong>PRACTICE</strong> &mdash; replay the same room as many times as you like, no pressure, no timer.</p>
+          <p class="htp-tagline">One shot. No mistakes.</p>
+        </div>
+
+        <button id="btn-howtoplay-back" class="btn btn-primary">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ DIFFICULTY SELECT ============ -->
+    <div id="screen-difficulty" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="section-title">SELECT DIFFICULTY</h2>
+
+        <div class="diff-list">
+          <button class="diff-row diff-easy" data-difficulty="easy">
+            <span class="diff-glyph">I</span>
+            <span class="diff-text">
+              <span class="diff-name">EASY</span>
+              <span class="diff-desc">10 rooms &middot; direct shots, gentle bounces</span>
+            </span>
+            <span class="diff-arrow">&#8594;</span>
+          </button>
+
+          <button class="diff-row diff-medium" data-difficulty="medium">
+            <span class="diff-glyph">II</span>
+            <span class="diff-text">
+              <span class="diff-name">MEDIUM</span>
+              <span class="diff-desc">10 rooms &middot; bounces and obstacles</span>
+            </span>
+            <span class="diff-arrow">&#8594;</span>
+          </button>
+
+          <button class="diff-row diff-hard" data-difficulty="hard">
+            <span class="diff-glyph">III</span>
+            <span class="diff-text">
+              <span class="diff-name">HARD</span>
+              <span class="diff-desc">10 rooms &middot; precision only, no mercy</span>
+            </span>
+            <span class="diff-arrow">&#8594;</span>
+          </button>
+        </div>
+
+        <button id="btn-diff-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ MODE SELECT ============ -->
+    <div id="screen-mode" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="section-title">SELECT MODE</h2>
+
+        <div class="mode-grid">
+          <button class="mode-card mode-card-normal" data-mode="normal">
+            <span class="mode-icon">
+              <svg viewBox="0 0 24 24" width="42" height="42" aria-hidden="true">
+                <line x1="9" y1="2" x2="15" y2="2" />
+                <line x1="12" y1="2.5" x2="12" y2="5.5" />
+                <circle cx="12" cy="13.5" r="8.5" />
+                <line x1="12" y1="13.5" x2="12" y2="8.5" />
+                <line x1="12" y1="13.5" x2="16" y2="15.5" />
+              </svg>
+            </span>
+            <span class="mode-name">NORMAL RUN</span>
+            <span class="mode-desc">Clear all 10 rooms in one go. One miss sends you back to room 1. Timed.</span>
+          </button>
+
+          <button class="mode-card mode-card-practice" data-mode="practice">
+            <span class="mode-icon">
+              <svg viewBox="0 0 24 24" width="42" height="42" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="5" />
+                <circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none" />
+              </svg>
+            </span>
+            <span class="mode-name">PRACTICE</span>
+            <span class="mode-desc">Retry the same room as many times as you want. No pressure, no run timer.</span>
+          </button>
+        </div>
+
+        <button id="btn-mode-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ PAUSE MENU ============ -->
+    <div id="screen-pause" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="section-title">PAUSED</h2>
+
+        <div class="pause-list">
+          <button id="btn-resume" class="pause-row pause-resume">
+            <span class="pause-glyph">&#9654;</span>
+            <span class="pause-text">
+              <span class="pause-name">RESUME</span>
+              <span class="pause-desc">Back to the room</span>
+            </span>
+          </button>
+
+          <button id="btn-restart-level" class="pause-row pause-level">
+            <span class="pause-glyph">&#8635;</span>
+            <span class="pause-text">
+              <span class="pause-name">RESTART LEVEL</span>
+              <span class="pause-desc">Replay the current room</span>
+            </span>
+          </button>
+
+          <button id="btn-restart-run" class="pause-row pause-run">
+            <span class="pause-glyph">&#10226;</span>
+            <span class="pause-text">
+              <span class="pause-name">RESTART RUN</span>
+              <span class="pause-desc">Back to room 1 of this difficulty</span>
+            </span>
+          </button>
+
+          <button id="btn-pause-menu" class="pause-row pause-home">
+            <span class="pause-glyph">&#8962;</span>
+            <span class="pause-text">
+              <span class="pause-name">MAIN MENU</span>
+              <span class="pause-desc">Quit the run and go back</span>
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ WIN SCREEN (room cleared) ============ -->
+    <div id="screen-win" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="result-title win" id="win-title">ROOM 1 CLEARED</h2>
+
+        <div class="time-panel">
+          <div class="time-row">
+            <span class="time-label">ROOM TIME</span>
+            <span class="time-value" id="win-room-time">0.00s</span>
+          </div>
+          <div class="time-row" id="win-total-row">
+            <span class="time-label">TOTAL</span>
+            <span class="time-value muted" id="win-total-time">0.00s</span>
+          </div>
+        </div>
+
+        <button id="btn-next" class="btn btn-primary">NEXT ROOM</button>
+        <div class="btn-row">
+          <button id="btn-win-retry" class="btn btn-ghost">RETRY</button>
+          <button id="btn-win-menu" class="btn btn-ghost">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ LOSE SCREEN (practice mode) ============ -->
+    <div id="screen-lose" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="result-title lose">YOU MISSED</h2>
+        <p class="subtitle" id="lose-sub">Practice mode &middot; take another shot</p>
+
+        <div class="time-panel">
+          <div class="time-row">
+            <span class="time-label">ROOM TIME</span>
+            <span class="time-value" id="lose-room-time">0.00s</span>
+          </div>
+        </div>
+
+        <button id="btn-retry" class="btn btn-primary">RETRY</button>
+        <div class="btn-row">
+          <button id="btn-lose-menu" class="btn btn-ghost">MAIN MENU</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ RUN FAILED (normal mode) ============ -->
+    <div id="screen-failed" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="result-title lose">RUN FAILED</h2>
+        <p class="subtitle" id="failed-sub">You missed in room 1 &middot; back to the start</p>
+
+        <div class="time-panel">
+          <div class="time-row">
+            <span class="time-label">REACHED</span>
+            <span class="time-value" id="failed-room">ROOM 1</span>
+          </div>
+          <div class="time-row">
+            <span class="time-label">TIME</span>
+            <span class="time-value muted" id="failed-time">0.00s</span>
+          </div>
+        </div>
+
+        <div class="icon-btn-row">
+          <button id="btn-failed-restart" class="icon-btn icon-reset" aria-label="Restart run" title="Restart run">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+              <polyline points="20 4 20 9 15 9" />
+            </svg>
+            <span class="icon-btn-label">RESTART</span>
+          </button>
+          <button id="btn-failed-menu" class="icon-btn icon-home" aria-label="Main menu" title="Main menu">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M3.5 11.5 12 4l8.5 7.5" />
+              <path d="M5.5 10.5V20h13v-9.5" />
+              <path d="M9.8 20v-5.4h4.4V20" />
+            </svg>
+            <span class="icon-btn-label">MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ENDLESS OVER ============ -->
+    <div id="screen-endless-over" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="result-title lose">ENDLESS OVER</h2>
+        <p class="subtitle">One bullet, every room &middot; the streak ends here</p>
+
+        <div class="time-panel">
+          <div class="time-row">
+            <span class="time-label">ROOM REACHED</span>
+            <span class="time-value" id="endless-over-room">1</span>
+          </div>
+          <div class="time-row">
+            <span class="time-label">SCORE</span>
+            <span class="time-value" id="endless-over-score">0</span>
+          </div>
+          <div class="time-row" id="endless-over-best-row">
+            <span class="time-label">BEST</span>
+            <span class="time-value muted" id="endless-over-best">--</span>
+          </div>
+        </div>
+
+        <div class="icon-btn-row">
+          <button id="btn-endless-retry" class="icon-btn icon-reset" aria-label="Retry run" title="Retry run">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+              <polyline points="20 4 20 9 15 9" />
+            </svg>
+            <span class="icon-btn-label">RETRY</span>
+          </button>
+          <button id="btn-endless-menu" class="icon-btn icon-home" aria-label="Main menu" title="Main menu">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M3.5 11.5 12 4l8.5 7.5" />
+              <path d="M5.5 10.5V20h13v-9.5" />
+              <path d="M9.8 20v-5.4h4.4V20" />
+            </svg>
+            <span class="icon-btn-label">MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CAMPAIGN COMPLETE ============ -->
+    <div id="screen-complete" class="screen hidden">
+      <div class="menu-inner">
+        <h2 class="result-title win">ALL ROOMS CLEARED</h2>
+        <p class="subtitle">You never needed a second bullet.</p>
+
+        <div class="time-panel final">
+          <div class="time-row">
+            <span class="time-label">FINAL TIME</span>
+            <span class="time-value big" id="complete-total-time">0.00s</span>
+          </div>
+          <div class="time-row">
+            <span class="time-label">BEST</span>
+            <span class="time-value muted" id="complete-best-time">--</span>
+          </div>
+        </div>
+
+        <div class="icon-btn-row">
+          <button id="btn-complete-restart" class="icon-btn icon-reset" aria-label="Run again" title="Run again">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M20 12a8 8 0 1 1-2.34-5.66" />
+              <polyline points="20 4 20 9 15 9" />
+            </svg>
+            <span class="icon-btn-label">AGAIN</span>
+          </button>
+          <button id="btn-complete-menu" class="icon-btn icon-home" aria-label="Main menu" title="Main menu">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M3.5 11.5 12 4l8.5 7.5" />
+              <path d="M5.5 10.5V20h13v-9.5" />
+              <path d="M9.8 20v-5.4h4.4V20" />
+            </svg>
+            <span class="icon-btn-label">MENU</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
