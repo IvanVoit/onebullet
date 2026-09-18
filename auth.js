@@ -96,6 +96,9 @@ const Account = {
     if (data.endless_best_time !== null && data.endless_best_time !== undefined) {
       game.endlessBest.time = data.endless_best_time;
     }
+    if (data.best_progress && typeof data.best_progress === 'object') {
+      game.bestProgress = { ...game.bestProgress, ...data.best_progress };
+    }
   },
 
   // Push current in-memory bests up to Supabase (or localStorage as a
@@ -113,6 +116,7 @@ const Account = {
       endless_best_room: game.endlessBest.room,
       endless_best_score: game.endlessBest.score,
       endless_best_time: game.endlessBest.time,
+      best_progress: game.bestProgress,
       updated_at: new Date().toISOString()
     };
 
@@ -124,7 +128,8 @@ const Account = {
     try {
       localStorage.setItem(GUEST_STORAGE_KEY, JSON.stringify({
         bestTimes: game.bestTimes,
-        endlessBest: game.endlessBest
+        endlessBest: game.endlessBest,
+        bestProgress: game.bestProgress
       }));
     } catch (err) {
       // storage unavailable - not fatal
@@ -138,6 +143,7 @@ const Account = {
       const data = JSON.parse(raw);
       if (data.bestTimes) game.bestTimes = { ...game.bestTimes, ...data.bestTimes };
       if (data.endlessBest) game.endlessBest = { ...game.endlessBest, ...data.endlessBest };
+      if (data.bestProgress) game.bestProgress = { ...game.bestProgress, ...data.bestProgress };
     } catch (err) {
       // corrupt or missing - ignore
     }
@@ -268,12 +274,9 @@ function setupAccountUI() {
       profileUsername.textContent = name.toUpperCase();
       profileAvatar.textContent = name.charAt(0).toUpperCase();
 
-      document.getElementById('stat-easy').textContent =
-        game.bestTimes.easy !== undefined ? formatTime(game.bestTimes.easy) : '--';
-      document.getElementById('stat-medium').textContent =
-        game.bestTimes.medium !== undefined ? formatTime(game.bestTimes.medium) : '--';
-      document.getElementById('stat-hard').textContent =
-        game.bestTimes.hard !== undefined ? formatTime(game.bestTimes.hard) : '--';
+      document.getElementById('stat-easy').textContent = getDifficultyBestLabel('easy');
+      document.getElementById('stat-medium').textContent = getDifficultyBestLabel('medium');
+      document.getElementById('stat-hard').textContent = getDifficultyBestLabel('hard');
 
       document.getElementById('stat-endless-time').textContent =
         game.endlessBest.time !== null && game.endlessBest.time !== undefined

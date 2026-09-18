@@ -150,6 +150,10 @@ const game = {
   runTime: 0,         // seconds accumulated across the whole run
   lastRoomTime: 0,    // room time frozen when the room ended
   bestTimes: {},      // best completed-run time per difficulty
+  // Furthest room reached (1-based) on a difficulty NOT yet completed.
+  // Once bestTimes[difficulty] exists, this stops being shown (the time
+  // takes over), but it's kept around in case a save gets loaded oddly.
+  bestProgress: { easy: null, medium: null, hard: null },
 
   // --- Endless mode ---
   endless: false,           // true while an Endless run is active
@@ -963,6 +967,9 @@ const ui = {
   btnOpenHowToPlay: document.getElementById('btn-open-howtoplay'),
   btnHowToPlayBack: document.getElementById('btn-howtoplay-back'),
   btnDiffBack: document.getElementById('btn-diff-back'),
+  diffBestEasy: document.getElementById('diff-best-easy'),
+  diffBestMedium: document.getElementById('diff-best-medium'),
+  diffBestHard: document.getElementById('diff-best-hard'),
   btnModeBack: document.getElementById('btn-mode-back'),
   btnNext: document.getElementById('btn-next'),
   btnRetry: document.getElementById('btn-retry'),
@@ -1115,6 +1122,7 @@ function renderControlsScreen() {
 function goToDifficultySelect() {
   game.state = STATE.DIFFICULTY;
   ui.hud.classList.add('hidden');
+  renderDifficultyBests();
   showScreen(ui.screenDifficulty);
 }
 
@@ -1398,6 +1406,18 @@ function endRoom(victory) {
     // back to room 1. The screen reports how far you got and how long.
     game.state = STATE.FAILED;
     const reachedRoom = game.currentLevelIndex + 1;
+
+    // Track "how far you've gotten" on this difficulty, but only while
+    // it's still uncompleted - once bestTimes exists the time takes over
+    // as the thing that's shown.
+    if (game.bestTimes[game.difficulty] === undefined) {
+      const previousBestRoom = game.bestProgress[game.difficulty] || 0;
+      if (reachedRoom > previousBestRoom) {
+        game.bestProgress[game.difficulty] = reachedRoom;
+        if (typeof Account !== 'undefined') Account.syncProgress();
+      }
+    }
+
     ui.failedSub.textContent = `You missed in room ${reachedRoom} \u00b7 back to the start`;
     ui.failedRoom.textContent = `ROOM ${reachedRoom} / ${game.levels.length}`;
     ui.failedTime.textContent = formatTime(game.runTime);
@@ -1409,6 +1429,26 @@ function endRoom(victory) {
     ui.loseRoomTime.textContent = formatTime(game.lastRoomTime);
     showScreen(ui.screenLose);
   }
+}
+
+// What to show as "your best" for a given difficulty: the completed-run
+// time if you've cleared all 10 rooms, otherwise the furthest room
+// you've reached, otherwise nothing yet attempted.
+function getDifficultyBestLabel(difficulty) {
+  if (game.bestTimes[difficulty] !== undefined) {
+    return formatTime(game.bestTimes[difficulty]);
+  }
+  if (game.bestProgress[difficulty]) {
+    return `ROOM ${game.bestProgress[difficulty]} / ${LEVEL_SETS[difficulty].length}`;
+  }
+  return '--';
+}
+
+// Refreshes the "best" chip on each row of the difficulty-select screen.
+function renderDifficultyBests() {
+  if (ui.diffBestEasy) ui.diffBestEasy.textContent = getDifficultyBestLabel('easy');
+  if (ui.diffBestMedium) ui.diffBestMedium.textContent = getDifficultyBestLabel('medium');
+  if (ui.diffBestHard) ui.diffBestHard.textContent = getDifficultyBestLabel('hard');
 }
 
 // Called when the last room of a difficulty has been cleared.
