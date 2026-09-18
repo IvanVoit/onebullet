@@ -225,15 +225,21 @@ body {
 }
 
 .menu-inner {
-  position: relative;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 18px;
   padding: 32px 40px;
-  padding-top: 150px; /* reserved slot for the logo - fixed regardless of logo size */
   width: 100%;
+}
+
+/* Reserved logo slot - ONLY on the main menu screen. Every other screen
+   (account, settings, difficulty...) reuses .menu-inner too, so this
+   must not leak into the shared rule above. */
+#screen-menu .menu-inner {
+  position: relative;
+  padding-top: 150px;
 }
 
 /* Fixed-height slot the logo sits in. The logo is bottom-aligned inside
@@ -252,7 +258,7 @@ body {
 }
 
 .title-logo {
-  max-height: 240px;
+  max-height: 230px;
   width: auto;
   max-width: 92%;
   display: block;
