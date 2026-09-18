@@ -225,20 +225,37 @@ body {
 }
 
 .menu-inner {
+  position: relative;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 18px;
   padding: 32px 40px;
+  padding-top: 150px; /* reserved slot for the logo - fixed regardless of logo size */
   width: 100%;
 }
 
+/* Fixed-height slot the logo sits in. The logo is bottom-aligned inside
+   it and allowed to overflow upward if it's taller than the slot, so
+   making the logo bigger never pushes the subtitle/dial down. */
+.title-wrap {
+  position: absolute;
+  top: 32px;
+  left: 0;
+  right: 0;
+  height: 118px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .title-logo {
-  width: min(80%, 400px);
-  height: auto;
+  max-height: 240px;
+  width: auto;
+  max-width: 92%;
   display: block;
-  margin: 0 auto;
 }
 
 .subtitle {
