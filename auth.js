@@ -180,7 +180,12 @@ const Account = {
     if (!email) throw new Error('Incorrect username or password.');
 
     const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-    if (error) throw new Error('Incorrect username or password.');
+    if (error) {
+      if (error.message && error.message.toLowerCase().includes('email not confirmed')) {
+        throw new Error('Confirm your email before logging in - check your inbox.');
+      }
+      throw new Error('Incorrect username or password.');
+    }
 
     this.user = data.user;
     await this.loadProfile();
