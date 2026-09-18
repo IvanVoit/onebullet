@@ -949,3 +949,147 @@ body {
   letter-spacing: 1px;
   margin-top: 4px;
 }
+/* ============ Account chip (main menu, top-right) ============ */
+
+.account-chip {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1.5px solid var(--wall-border);
+  background: rgba(16, 22, 31, 0.85);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.1s ease;
+}
+
+.account-chip:hover {
+  border-color: var(--player);
+  color: var(--player);
+  box-shadow: 0 0 14px var(--player-glow);
+}
+
+.account-chip:active {
+  transform: scale(0.96);
+}
+
+/* ============ Account screen: login / sign up / profile ============ */
+
+.account-inner {
+  width: 100%;
+  max-width: 340px;
+}
+
+.auth-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 6px;
+  border: 1.5px solid var(--wall-border);
+  background: rgba(16, 22, 31, 0.6);
+}
+
+.auth-tab {
+  flex: 1;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 9px 0;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.auth-tab.active {
+  background: rgba(79, 216, 196, 0.14);
+  color: var(--player);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.auth-input {
+  font-family: var(--mono);
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  padding: 12px 14px;
+  border-radius: 4px;
+  border: 1.5px solid var(--wall-border);
+  background: rgba(10, 14, 20, 0.8);
+  color: var(--text);
+  width: 100%;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.auth-input::placeholder {
+  color: var(--text-muted);
+}
+
+.auth-input:focus {
+  border-color: var(--player);
+  box-shadow: 0 0 14px var(--player-glow);
+}
+
+.auth-input.hidden {
+  display: none;
+}
+
+.auth-error {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--fail);
+  text-align: left;
+  line-height: 1.4;
+}
+
+.auth-error.hidden {
+  display: none;
+}
+
+#auth-submit {
+  width: 100%;
+  margin-top: 2px;
+}
+
+.account-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 14px 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--wall-border);
+  background: rgba(16, 22, 31, 0.7);
+  font-family: var(--mono);
+}
+
+.account-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
+
+.account-stat-row span:first-child {
+  color: var(--text-muted);
+}
+
+.account-stat-row span:last-child {
+  color: var(--text);
+  font-weight: 700;
+}

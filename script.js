@@ -938,6 +938,7 @@ const ui = {
   screenFailed: document.getElementById('screen-failed'),
   screenComplete: document.getElementById('screen-complete'),
   screenEndlessOver: document.getElementById('screen-endless-over'),
+  screenAccount: document.getElementById('screen-account'),
 
   hudRunChip: document.getElementById('hud-run-chip'),
   hudRunLabel: document.getElementById('hud-run-label'),
@@ -1008,7 +1009,8 @@ const ALL_SCREENS = [
   ui.screenLose,
   ui.screenFailed,
   ui.screenComplete,
-  ui.screenEndlessOver
+  ui.screenEndlessOver,
+  ui.screenAccount
 ];
 
 function showScreen(screen) {
@@ -1433,6 +1435,7 @@ function finishRun() {
     game.bestTimes[game.difficulty] = total;
     ui.completeBestTime.textContent = 'NEW RECORD';
     ui.completeTotalTime.classList.add('record');
+    if (typeof Account !== 'undefined') Account.syncProgress();
   } else {
     ui.completeBestTime.textContent = formatTime(previousBest);
     ui.completeTotalTime.classList.remove('record');
@@ -1957,6 +1960,7 @@ function endEndlessRoom(victory) {
   const isNewBestScore = game.endlessBest.score === null || game.endlessScore > game.endlessBest.score;
   if (isNewBestRoom) game.endlessBest.room = reachedRoom;
   if (isNewBestScore) game.endlessBest.score = game.endlessScore;
+  if ((isNewBestRoom || isNewBestScore) && typeof Account !== 'undefined') Account.syncProgress();
 
   ui.endlessOverRoom.textContent = `${reachedRoom}`;
   ui.endlessOverScore.textContent = game.endlessScore.toLocaleString();
@@ -1981,6 +1985,15 @@ function init() {
   setupUIListeners();
   showScreen(ui.screenMenu);
   requestAnimationFrame(loop);
+
+  // Account.init() also wires up the account screen (login/signup/logout)
+  // and, once it resolves, merges any saved best times / endless best into
+  // `game` - either from Supabase (logged in) or localStorage (guest).
+  if (typeof Account !== 'undefined') {
+    Account.init().then(() => {
+      updateHudScore();
+    });
+  }
 }
 
 init();

@@ -52,6 +52,9 @@
 
     <!-- ============ MAIN MENU ============ -->
     <div id="screen-menu" class="screen">
+      <button id="btn-account" class="account-chip" aria-label="Account" title="Account">
+        <span id="account-chip-label">GUEST</span>
+      </button>
       <div class="menu-inner">
         <h1 class="title">ONE BULLET</h1>
         <p class="subtitle">One shot. No mistakes.</p>
@@ -231,6 +234,47 @@
         </div>
 
         <button id="btn-mode-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ ACCOUNT (login / sign up / profile) ============ -->
+    <div id="screen-account" class="screen hidden">
+      <div class="menu-inner account-inner">
+        <h2 class="section-title">ACCOUNT</h2>
+
+        <!-- Logged-out: login / sign up form -->
+        <div id="account-guest-view">
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab active" data-tab="login">LOG IN</button>
+            <button type="button" class="auth-tab" data-tab="signup">SIGN UP</button>
+          </div>
+
+          <form id="auth-form" class="auth-form">
+            <input type="text" id="auth-username" class="auth-input hidden" placeholder="USERNAME" autocomplete="username">
+            <input type="email" id="auth-email" class="auth-input" placeholder="EMAIL" autocomplete="email" required>
+            <input type="password" id="auth-password" class="auth-input" placeholder="PASSWORD" autocomplete="current-password" required minlength="6">
+            <p id="auth-error" class="auth-error hidden"></p>
+            <button type="submit" id="auth-submit" class="btn btn-primary">LOG IN</button>
+          </form>
+
+          <button id="btn-account-guest" class="btn btn-ghost">CONTINUE AS GUEST</button>
+        </div>
+
+        <!-- Logged-in: profile + saved stats -->
+        <div id="account-profile-view" class="hidden">
+          <p class="subtitle" id="account-email">you@example.com</p>
+
+          <div class="account-stats">
+            <div class="account-stat-row"><span>EASY BEST</span><span id="stat-easy">--</span></div>
+            <div class="account-stat-row"><span>MEDIUM BEST</span><span id="stat-medium">--</span></div>
+            <div class="account-stat-row"><span>HARD BEST</span><span id="stat-hard">--</span></div>
+            <div class="account-stat-row"><span>ENDLESS BEST</span><span id="stat-endless">--</span></div>
+          </div>
+
+          <button id="btn-account-logout" class="btn btn-ghost">LOG OUT</button>
+        </div>
+
+        <button id="btn-account-back" class="btn btn-ghost">BACK</button>
       </div>
     </div>
 
@@ -436,6 +480,9 @@
 
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="auth.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
