@@ -957,6 +957,12 @@ const ui = {
   screenComplete: document.getElementById('screen-complete'),
   screenEndlessOver: document.getElementById('screen-endless-over'),
   screenAccount: document.getElementById('screen-account'),
+  screenLeaderboard: document.getElementById('screen-leaderboard'),
+  btnLeaderboard: document.getElementById('btn-leaderboard'),
+  btnEndlessLeaderboard: document.getElementById('btn-endless-leaderboard'),
+  btnLeaderboardBack: document.getElementById('btn-leaderboard-back'),
+  leaderboardList: document.getElementById('leaderboard-list'),
+  leaderboardYouRow: document.getElementById('leaderboard-you-row'),
 
   hudRunChip: document.getElementById('hud-run-chip'),
   hudRunLabel: document.getElementById('hud-run-label'),
@@ -1031,7 +1037,8 @@ const ALL_SCREENS = [
   ui.screenFailed,
   ui.screenComplete,
   ui.screenEndlessOver,
-  ui.screenAccount
+  ui.screenAccount,
+  ui.screenLeaderboard
 ];
 
 function showScreen(screen) {
@@ -1131,6 +1138,82 @@ function renderControlsScreen() {
   });
 }
 
+/* ---------- Endless leaderboard ---------- */
+
+// Minimal HTML escaping for anything built from a username - it's
+// constrained to [a-zA-Z0-9_] at signup, but this stays safe even if
+// that ever changes or a row comes from elsewhere.
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function buildLeaderboardRow(entry, isPinned) {
+  const el = document.createElement('div');
+  el.className = 'leaderboard-row' + (isPinned ? ' is-pinned' : '');
+  const score = entry.endless_best_score != null ? entry.endless_best_score.toLocaleString() : '0';
+  el.innerHTML = `
+    <span class="leaderboard-rank">#${entry.rank}</span>
+    <span class="leaderboard-name">${escapeHtml(entry.username || 'PLAYER')}</span>
+    <span class="leaderboard-score">${score}</span>
+  `;
+  return el;
+}
+
+async function renderLeaderboard() {
+  ui.leaderboardList.innerHTML = '<p class="leaderboard-status">LOADING&hellip;</p>';
+  ui.leaderboardYouRow.classList.add('hidden');
+  ui.leaderboardYouRow.innerHTML = '';
+
+  if (typeof Account === 'undefined') return;
+
+  const myId = Account.user ? Account.user.id : null;
+  const top = await Account.fetchLeaderboard(100);
+
+  if (!top.length) {
+    ui.leaderboardList.innerHTML = '<p class="leaderboard-status">NO SCORES YET - BE THE FIRST</p>';
+    return;
+  }
+
+  ui.leaderboardList.innerHTML = '';
+  let meInTop = null;
+  top.forEach((entry) => {
+    const row = buildLeaderboardRow(entry, false);
+    if (myId && entry.id === myId) {
+      row.classList.add('is-me');
+      meInTop = row;
+    }
+    ui.leaderboardList.appendChild(row);
+  });
+
+  if (meInTop) {
+    // Already visible in the top 100 - scroll it into view so a low rank
+    // (e.g. #87) doesn't require manual scrolling to confirm you're there.
+    meInTop.scrollIntoView({ block: 'center' });
+    return;
+  }
+
+  // Logged in but not in the top 100: fetch this player's real rank via
+  // get_endless_rank() and pin it below the list instead of leaving them
+  // wondering where they stand.
+  if (myId) {
+    const mine = await Account.fetchMyRank();
+    if (mine) {
+      const row = buildLeaderboardRow(mine, true);
+      row.classList.add('is-me');
+      ui.leaderboardYouRow.appendChild(row);
+      ui.leaderboardYouRow.classList.remove('hidden');
+    }
+  }
+}
+
+function goToLeaderboard() {
+  game.state = STATE.MENU;
+  showScreen(ui.screenLeaderboard);
+  renderLeaderboard();
+}
+
 /* ---------- Menu navigation ---------- */
 
 function goToDifficultySelect() {
@@ -1225,6 +1308,13 @@ function setupUIListeners() {
 
   ui.btnEndlessRetry.addEventListener('click', restartRun);
   ui.btnEndlessMenu.addEventListener('click', returnToMenu);
+  ui.btnEndlessLeaderboard.addEventListener('click', goToLeaderboard);
+
+  ui.btnLeaderboard.addEventListener('click', goToLeaderboard);
+  ui.btnLeaderboardBack.addEventListener('click', () => {
+    game.state = STATE.MENU;
+    showScreen(ui.screenMenu);
+  });
 
   ui.btnSettings.addEventListener('click', goToSettings);
   ui.btnSettingsBack.addEventListener('click', () => {

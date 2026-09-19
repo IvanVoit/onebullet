@@ -55,9 +55,12 @@
       <button id="btn-account" class="account-chip" aria-label="Account" title="Account">
         <span id="account-chip-label">GUEST</span>
       </button>
+      <button id="btn-leaderboard" class="leaderboard-chip" aria-label="Leaderboard" title="Leaderboard">
+        <span>&#127942;</span>
+      </button>
       <div class="menu-inner">
         <div class="title-wrap">
-          <img src="images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
+          <img src="/images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
         </div>
         <p class="subtitle">One shot. No mistakes.</p>
 
@@ -314,6 +317,21 @@
       </div>
     </div>
 
+    <!-- ============ ENDLESS LEADERBOARD ============ -->
+    <div id="screen-leaderboard" class="screen hidden">
+      <div class="menu-inner account-inner">
+        <h2 class="section-title">ENDLESS &middot; TOP 100</h2>
+
+        <div id="leaderboard-list" class="leaderboard-list">
+          <p class="leaderboard-status">LOADING&hellip;</p>
+        </div>
+
+        <div id="leaderboard-you-row" class="leaderboard-you-row hidden"></div>
+
+        <button id="btn-leaderboard-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
     <!-- ============ PAUSE MENU ============ -->
     <div id="screen-pause" class="screen hidden">
       <div class="menu-inner">
@@ -472,6 +490,16 @@
               <path d="M9.8 20v-5.4h4.4V20" />
             </svg>
             <span class="icon-btn-label">MENU</span>
+          </button>
+          <button id="btn-endless-leaderboard" class="icon-btn icon-leaderboard" aria-label="Leaderboard" title="Leaderboard">
+            <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+              <path d="M8 21h8" />
+              <path d="M12 17v4" />
+              <path d="M7 4h10v6a5 5 0 0 1-10 0V4z" />
+              <path d="M7 6H4.5A2.5 2.5 0 0 0 4 10.9L7 12" />
+              <path d="M17 6h2.5A2.5 2.5 0 0 1 20 10.9L17 12" />
+            </svg>
+            <span class="icon-btn-label">RANKING</span>
           </button>
         </div>
       </div>

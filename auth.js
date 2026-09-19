@@ -223,6 +223,36 @@ const Account = {
       .update({ username })
       .eq('id', this.user.id);
     if (error) console.error('claimUsername error:', error);
+  },
+
+  /* ---------------- endless leaderboard ---------------- */
+
+  // Top N players by endless_best_score, via the get_endless_leaderboard()
+  // SQL function (SECURITY DEFINER - see setup guide). This intentionally
+  // does NOT read the "profiles" table directly: that table is RLS-locked
+  // to each user's own row, and the function is the only thing allowed to
+  // hand out other players' username/score/room/time publicly.
+  async fetchLeaderboard(limit = 100) {
+    const { data, error } = await supabaseClient
+      .rpc('get_endless_leaderboard', { p_limit: limit });
+    if (error) {
+      console.error('fetchLeaderboard error:', error);
+      return [];
+    }
+    return data || [];
+  },
+
+  // Current user's rank + stats even when they fall outside the top N.
+  // Guests have no cloud save, so there is nothing to rank - null.
+  async fetchMyRank() {
+    if (!this.user) return null;
+    const { data, error } = await supabaseClient
+      .rpc('get_endless_rank', { p_user_id: this.user.id });
+    if (error) {
+      console.error('fetchMyRank error:', error);
+      return null;
+    }
+    return (data && data[0]) || null;
   }
 };
 
