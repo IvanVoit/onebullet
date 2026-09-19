@@ -177,9 +177,30 @@ const game = {
   // ENDLESS_CONFIG.scoring.streakTimeThreshold) - drives the score
   // multiplier. Resets to 0 on any slower clear, not on death.
   endlessStreak: 0,
-  // Kept around for future competitive features (best room / best score /
-  // fastest clear / leaderboards). Only tracked in memory for now.
-  endlessBest: { room: null, score: null, time: null, paceScore: null, paceRoom: null, paceTime: null },
+  // Two grouped records, each describing one single run rather than
+  // three independently-maximized numbers - so a run's room/score/time
+  // shown together always actually happened together:
+  //  - run:  the deepest run you've had (ties broken by higher score),
+  //          with that same run's score and time.
+  //  - pace: the run with the best room^2/time ratio (see
+  //          endlessPaceScore), with that same run's room/time/score.
+  endlessBest: {
+    run: { room: null, score: null, time: null },
+    pace: { metric: null, room: null, time: null, score: null }
+  },
+
+  // --- Lifetime totals (logged-in accounts only) ---
+  // Rooms cleared and enemies eliminated across normal + endless runs
+  // (practice mode is excluded - it replays the same room on purpose).
+  //  - lifetime:        the total shown in the UI (cloud total + anything
+  //                     not yet uploaded).
+  //  - lifetimePending: what's been earned since the last successful
+  //                     upload. Account.flushStats() sends these DELTAS
+  //                     to the add_player_totals() SQL function, which adds
+  //                     them atomically - so two devices/tabs can never
+  //                     overwrite each other's totals.
+  lifetime: { rooms: 0, enemies: 0 },
+  lifetimePending: { rooms: 0, enemies: 0 },
 
   lastTimestamp: 0
 };
@@ -672,7 +693,18 @@ function killEnemy(index) {
   const enemy = game.enemies[index];
   spawnImpactParticles(enemy.x, enemy.y, CONFIG.colors.enemy);
   game.enemies.splice(index, 1);
+  trackLifetime('enemies');
   updateHudEnemyCount();
+}
+
+// Bumps a lifetime counter ('rooms' | 'enemies'). Only counts for
+// logged-in players (guests have no cloud save to attach totals to) and
+// never in practice mode.
+function trackLifetime(stat) {
+  if (typeof Account === 'undefined' || !Account.user) return;
+  if (game.mode === 'practice') return;
+  game.lifetime[stat]++;
+  game.lifetimePending[stat]++;
 }
 
 /* ======================================================================
@@ -1217,19 +1249,23 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// Shared by the leaderboard's PACE column and the account/player stats
+// cards: pace is only meaningful as the room/time pair it was computed
+// from, not the bare ratio, so both places show "ROOM 50 - 1:36" rather
+// than a number on its own.
+function formatPaceLabel(room, time) {
+  if (room == null || time == null) return '--';
+  return `ROOM ${room} \u00b7 ${formatTime(time)}`;
+}
+
 // The value column reads differently per metric: a plain number for
-// score, "ROOM 50" for room, and "ROOM 50 - 1:36" for pace (showing the
-// actual room/time pair a ratio was computed from, not just the ratio,
-// per the design discussion - a bare number is meaningless on its own).
+// score, "ROOM 50" for room, and the pace label above for pace.
 function formatLeaderboardValue(entry) {
   if (leaderboardMetric === 'room') {
     return `ROOM ${entry.endless_best_room ?? '--'}`;
   }
   if (leaderboardMetric === 'pace') {
-    const room = entry.endless_best_pace_room;
-    const time = entry.endless_best_pace_time;
-    if (room == null || time == null) return '--';
-    return `ROOM ${room} \u00b7 ${formatTime(time)}`;
+    return formatPaceLabel(entry.endless_best_pace_room, entry.endless_best_pace_time);
   }
   const score = entry.endless_best_score;
   return score != null ? score.toLocaleString() : '0';
@@ -1243,6 +1279,21 @@ function buildLeaderboardRow(entry, isPinned) {
     <span class="leaderboard-name">${escapeHtml(entry.username || 'PLAYER')}</span>
     <span class="leaderboard-score">${formatLeaderboardValue(entry)}</span>
   `;
+
+  // Tapping a row opens that player's stats - same modal for the pinned
+  // "you" row so tapping your own entry works too.
+  if (entry.id) {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('click', () => openPlayerStatsModal(entry.id, entry.username));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openPlayerStatsModal(entry.id, entry.username);
+      }
+    });
+  }
+
   return el;
 }
 
@@ -1305,6 +1356,83 @@ function goToLeaderboard() {
   game.state = STATE.MENU;
   showScreen(ui.screenLeaderboard);
   renderLeaderboard();
+}
+
+/* ---------- Player stats modal (tap a row on the leaderboard) ---------- */
+
+const playerStatsUI = {
+  modal: document.getElementById('player-stats-modal'),
+  avatar: document.getElementById('player-stats-avatar'),
+  username: document.getElementById('player-stats-username'),
+  status: document.getElementById('player-stats-status'),
+  body: document.getElementById('player-stats-body'),
+  closeBtn: document.getElementById('btn-player-stats-close')
+};
+
+async function openPlayerStatsModal(userId, username) {
+  if (!userId) return;
+
+  const displayName = (username || 'PLAYER').toUpperCase();
+  playerStatsUI.username.textContent = displayName;
+  playerStatsUI.avatar.textContent = displayName.charAt(0);
+  playerStatsUI.body.classList.add('hidden');
+  playerStatsUI.status.textContent = 'LOADING\u2026';
+  playerStatsUI.status.classList.remove('hidden');
+  playerStatsUI.modal.classList.remove('hidden');
+
+  const stats = typeof Account !== 'undefined' ? await Account.fetchPlayerStats(userId) : null;
+
+  // The modal may have been closed while the request was in flight.
+  if (playerStatsUI.modal.classList.contains('hidden')) return;
+
+  if (!stats) {
+    playerStatsUI.status.textContent = "COULDN'T LOAD THIS PLAYER'S STATS";
+    return;
+  }
+
+  document.getElementById('player-stat-easy').textContent =
+    formatDifficultyStatFrom(stats.best_times, stats.best_progress, 'easy');
+  document.getElementById('player-stat-medium').textContent =
+    formatDifficultyStatFrom(stats.best_times, stats.best_progress, 'medium');
+  document.getElementById('player-stat-hard').textContent =
+    formatDifficultyStatFrom(stats.best_times, stats.best_progress, 'hard');
+
+  document.getElementById('player-stat-run-time').textContent =
+    stats.endless_best_time !== null && stats.endless_best_time !== undefined
+      ? formatTime(stats.endless_best_time) : '--';
+  document.getElementById('player-stat-run-score').textContent =
+    stats.endless_best_score !== null && stats.endless_best_score !== undefined
+      ? stats.endless_best_score.toLocaleString() : '--';
+  document.getElementById('player-stat-run-room').textContent =
+    stats.endless_best_room !== null && stats.endless_best_room !== undefined
+      ? stats.endless_best_room : '--';
+
+  document.getElementById('player-stat-pace-time').textContent =
+    stats.endless_best_pace_time !== null && stats.endless_best_pace_time !== undefined
+      ? formatTime(stats.endless_best_pace_time) : '--';
+  document.getElementById('player-stat-pace-score').textContent =
+    stats.endless_best_pace_run_score !== null && stats.endless_best_pace_run_score !== undefined
+      ? stats.endless_best_pace_run_score.toLocaleString() : '--';
+  document.getElementById('player-stat-pace-room').textContent =
+    stats.endless_best_pace_room !== null && stats.endless_best_pace_room !== undefined
+      ? stats.endless_best_pace_room : '--';
+
+  document.getElementById('player-stat-best-room').textContent =
+    stats.endless_best_room !== null && stats.endless_best_room !== undefined
+      ? stats.endless_best_room : '--';
+  document.getElementById('player-stat-rooms-cleared').textContent =
+    stats.total_rooms_cleared !== null && stats.total_rooms_cleared !== undefined
+      ? Number(stats.total_rooms_cleared).toLocaleString() : '--';
+  document.getElementById('player-stat-enemies-eliminated').textContent =
+    stats.total_enemies_eliminated !== null && stats.total_enemies_eliminated !== undefined
+      ? Number(stats.total_enemies_eliminated).toLocaleString() : '--';
+
+  playerStatsUI.status.classList.add('hidden');
+  playerStatsUI.body.classList.remove('hidden');
+}
+
+function closePlayerStatsModal() {
+  playerStatsUI.modal.classList.add('hidden');
 }
 
 /* ---------- Menu navigation ---------- */
@@ -1411,6 +1539,16 @@ function setupUIListeners() {
 
   document.querySelectorAll('.leaderboard-tabs .auth-tab').forEach((tab) => {
     tab.addEventListener('click', () => setLeaderboardMetric(tab.dataset.metric));
+  });
+
+  playerStatsUI.closeBtn.addEventListener('click', closePlayerStatsModal);
+  playerStatsUI.modal.addEventListener('click', (e) => {
+    if (e.target === playerStatsUI.modal) closePlayerStatsModal();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !playerStatsUI.modal.classList.contains('hidden')) {
+      closePlayerStatsModal();
+    }
   });
 
   ui.btnSettings.addEventListener('click', goToSettings);
@@ -1586,6 +1724,9 @@ function endRoom(victory) {
   game.lastRoomTime = game.roomTime;
 
   if (victory) {
+    trackLifetime('rooms');
+    if (typeof Account !== 'undefined') Account.flushStats();
+
     // Clearing the LAST room jumps straight to the final completion
     // screen instead of showing an intermediate "ROOM CLEARED" + NEXT ROOM.
     if (game.currentLevelIndex + 1 >= game.levels.length) {
@@ -1610,6 +1751,7 @@ function endRoom(victory) {
     // back to room 1. The screen reports how far you got and how long.
     game.state = STATE.FAILED;
     const reachedRoom = game.currentLevelIndex + 1;
+    if (typeof Account !== 'undefined') Account.flushStats();
 
     // Track "how far you've gotten" on this difficulty, but only while
     // it's still uncompleted - once bestTimes exists the time takes over
@@ -1641,14 +1783,22 @@ function endRoom(victory) {
 // What to show as "your best" for a given difficulty: the completed-run
 // time if you've cleared all 10 rooms, otherwise the furthest room
 // you've reached, otherwise nothing yet attempted.
-function getDifficultyBestLabel(difficulty) {
-  if (game.bestTimes[difficulty] !== undefined) {
-    return formatTime(game.bestTimes[difficulty]);
+// Same rule as getDifficultyBestLabel() below, but taking explicit
+// bestTimes/bestProgress objects instead of reading them off `game` -
+// so the player-stats modal can format another player's fetched stats
+// with the exact same logic used for your own.
+function formatDifficultyStatFrom(bestTimes, bestProgress, difficulty) {
+  if (bestTimes && bestTimes[difficulty] !== undefined && bestTimes[difficulty] !== null) {
+    return formatTime(bestTimes[difficulty]);
   }
-  if (game.bestProgress[difficulty]) {
-    return `${game.bestProgress[difficulty]} / ${LEVEL_SETS[difficulty].length}`;
+  if (bestProgress && bestProgress[difficulty]) {
+    return `${bestProgress[difficulty]} / ${LEVEL_SETS[difficulty].length}`;
   }
   return '--';
+}
+
+function getDifficultyBestLabel(difficulty) {
+  return formatDifficultyStatFrom(game.bestTimes, game.bestProgress, difficulty);
 }
 
 // Refreshes the "best" chip on each row of the difficulty-select screen.
@@ -1694,6 +1844,9 @@ function finishRun() {
 // Quits to the main menu and fully resets the run: back to room 1 and
 // clears the current room, bullet and enemies.
 function returnToMenu() {
+  // Quitting mid-run: upload any lifetime totals earned so far.
+  if (typeof Account !== 'undefined') Account.flushStats();
+
   game.state = STATE.MENU;
   game.currentLevelIndex = 0;
   game.roomTime = 0;
@@ -2227,6 +2380,12 @@ function endEndlessRoom(victory) {
     updateHudStreak();
     game.endlessRoom++;
 
+    // Lifetime totals: uploaded when the run ends / on returning to the
+    // menu, plus every 10 rooms so a long run that gets abandoned (closed
+    // tab, dead battery) doesn't lose everything since the last upload.
+    trackLifetime('rooms');
+    if (game.lifetimePending.rooms >= 10 && typeof Account !== 'undefined') Account.flushStats();
+
     // Brief pause so the last kill reads before the next room appears. The
     // clock (and enemy count) just holds still through this pause - it
     // resumes the instant the next room spawns.
@@ -2244,25 +2403,34 @@ function endEndlessRoom(victory) {
   ui.hud.classList.add('hidden');
 
   const reachedRoom = game.endlessRoom;
-  const isNewBestRoom = game.endlessBest.room === null || reachedRoom > game.endlessBest.room;
-  const isNewBestScore = game.endlessBest.score === null || game.endlessScore > game.endlessBest.score;
-  const isNewBestTime = game.endlessBest.time === null || game.runTime > game.endlessBest.time;
+
+  // "Best run" is one record, not three independent ones: whichever run
+  // got deepest (ties broken by score) is THE best run, and its score
+  // and time are whatever that run actually had - never mixed in from
+  // a different, unrelated run.
+  const bestRun = game.endlessBest.run;
+  const isNewBestRun =
+    bestRun.room === null ||
+    reachedRoom > bestRun.room ||
+    (reachedRoom === bestRun.room && game.endlessScore > bestRun.score);
+
   const paceScore = endlessPaceScore(reachedRoom, game.runTime);
-  const isNewBestPace = game.endlessBest.paceScore === null || paceScore > game.endlessBest.paceScore;
-  if (isNewBestRoom) game.endlessBest.room = reachedRoom;
-  if (isNewBestScore) game.endlessBest.score = game.endlessScore;
-  if (isNewBestTime) game.endlessBest.time = game.runTime;
-  if (isNewBestPace) {
-    game.endlessBest.paceScore = paceScore;
-    game.endlessBest.paceRoom = reachedRoom;
-    game.endlessBest.paceTime = game.runTime;
+  const bestPace = game.endlessBest.pace;
+  const isNewBestPace = bestPace.metric === null || paceScore > bestPace.metric;
+
+  if (isNewBestRun) {
+    game.endlessBest.run = { room: reachedRoom, score: game.endlessScore, time: game.runTime };
   }
-  if ((isNewBestRoom || isNewBestScore || isNewBestTime || isNewBestPace) && typeof Account !== 'undefined') Account.syncProgress();
+  if (isNewBestPace) {
+    game.endlessBest.pace = { metric: paceScore, room: reachedRoom, time: game.runTime, score: game.endlessScore };
+  }
+  if ((isNewBestRun || isNewBestPace) && typeof Account !== 'undefined') Account.syncProgress();
+  if (typeof Account !== 'undefined') Account.flushStats();
 
   ui.endlessOverRoom.textContent = `${reachedRoom}`;
   ui.endlessOverScore.textContent = game.endlessScore.toLocaleString();
-  if (game.endlessBest.room !== null) {
-    ui.endlessOverBest.textContent = `ROOM ${game.endlessBest.room} \u00b7 ${game.endlessBest.score.toLocaleString()}`;
+  if (game.endlessBest.run.room !== null) {
+    ui.endlessOverBest.textContent = `ROOM ${game.endlessBest.run.room} \u00b7 ${game.endlessBest.run.score.toLocaleString()}`;
   } else {
     ui.endlessOverBest.textContent = '--';
   }
@@ -2282,6 +2450,14 @@ function init() {
   setupUIListeners();
   showScreen(ui.screenMenu);
   requestAnimationFrame(loop);
+
+  // Best-effort upload of lifetime totals when the tab is hidden or being
+  // closed (the last chance we reliably get before the page goes away).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && typeof Account !== 'undefined') {
+      Account.flushStats();
+    }
+  });
 
   // Account.init() also wires up the account screen (login/signup/logout)
   // and, once it resolves, merges any saved best times / endless best into

@@ -88,21 +88,53 @@ const Account = {
       game.bestTimes = { ...game.bestTimes, ...data.best_times };
     }
     if (data.endless_best_room !== null && data.endless_best_room !== undefined) {
-      game.endlessBest.room = data.endless_best_room;
+      game.endlessBest.run.room = data.endless_best_room;
     }
     if (data.endless_best_score !== null && data.endless_best_score !== undefined) {
-      game.endlessBest.score = data.endless_best_score;
+      game.endlessBest.run.score = data.endless_best_score;
     }
     if (data.endless_best_time !== null && data.endless_best_time !== undefined) {
-      game.endlessBest.time = data.endless_best_time;
+      game.endlessBest.run.time = data.endless_best_time;
     }
     if (data.endless_best_pace_score !== null && data.endless_best_pace_score !== undefined) {
-      game.endlessBest.paceScore = data.endless_best_pace_score;
-      game.endlessBest.paceRoom = data.endless_best_pace_room;
-      game.endlessBest.paceTime = data.endless_best_pace_time;
+      game.endlessBest.pace.metric = data.endless_best_pace_score;
+      game.endlessBest.pace.room = data.endless_best_pace_room;
+      game.endlessBest.pace.time = data.endless_best_pace_time;
+      game.endlessBest.pace.score = data.endless_best_pace_run_score;
     }
     if (data.best_progress && typeof data.best_progress === 'object') {
       game.bestProgress = { ...game.bestProgress, ...data.best_progress };
+    }
+
+    // Lifetime totals: cloud value + anything earned but not uploaded yet,
+    // so a background profile reload (e.g. token refresh) can't make the
+    // displayed numbers dip.
+    game.lifetime.rooms = (Number(data.total_rooms_cleared) || 0) + game.lifetimePending.rooms;
+    game.lifetime.enemies = (Number(data.total_enemies_eliminated) || 0) + game.lifetimePending.enemies;
+  },
+
+  // Uploads lifetime totals earned since the last upload. Sends DELTAS to
+  // add_player_totals() (atomic increment on the server) instead of
+  // overwriting the row, so multiple devices/tabs can't clobber each
+  // other. Fire-and-forget like syncProgress(): on failure the deltas are
+  // put back and retried on the next flush.
+  async flushStats() {
+    if (!this.user) return;
+    const rooms = game.lifetimePending.rooms;
+    const enemies = game.lifetimePending.enemies;
+    if (!rooms && !enemies) return;
+
+    // Take the deltas out of "pending" up front so a kill that lands while
+    // the request is in flight isn't sent twice or lost.
+    game.lifetimePending.rooms -= rooms;
+    game.lifetimePending.enemies -= enemies;
+
+    const { error } = await supabaseClient
+      .rpc('add_player_totals', { p_rooms: rooms, p_enemies: enemies });
+    if (error) {
+      console.error('flushStats error:', error);
+      game.lifetimePending.rooms += rooms;
+      game.lifetimePending.enemies += enemies;
     }
   },
 
@@ -118,12 +150,13 @@ const Account = {
     const payload = {
       id: this.user.id,
       best_times: game.bestTimes,
-      endless_best_room: game.endlessBest.room,
-      endless_best_score: game.endlessBest.score,
-      endless_best_time: game.endlessBest.time,
-      endless_best_pace_score: game.endlessBest.paceScore,
-      endless_best_pace_room: game.endlessBest.paceRoom,
-      endless_best_pace_time: game.endlessBest.paceTime,
+      endless_best_room: game.endlessBest.run.room,
+      endless_best_score: game.endlessBest.run.score,
+      endless_best_time: game.endlessBest.run.time,
+      endless_best_pace_score: game.endlessBest.pace.metric,
+      endless_best_pace_room: game.endlessBest.pace.room,
+      endless_best_pace_time: game.endlessBest.pace.time,
+      endless_best_pace_run_score: game.endlessBest.pace.score,
       best_progress: game.bestProgress,
       updated_at: new Date().toISOString()
     };
@@ -207,9 +240,13 @@ const Account = {
   },
 
   async signOut() {
+    // Must happen while still logged in - the upload needs the session.
+    await this.flushStats();
     await supabaseClient.auth.signOut();
     this.user = null;
     this.profile = null;
+    game.lifetime = { rooms: 0, enemies: 0 };
+    game.lifetimePending = { rooms: 0, enemies: 0 };
     // Reset in-memory progress first: loadGuestProgress() MERGES whatever
     // it finds into `game`, and without this reset any pre-signup guest
     // save left in localStorage would overwrite matching fields of the
@@ -217,7 +254,10 @@ const Account = {
     // of old guest numbers and account numbers instead of a clean switch.
     game.bestTimes = {};
     game.bestProgress = { easy: null, medium: null, hard: null };
-    game.endlessBest = { room: null, score: null, time: null };
+    game.endlessBest = {
+      run: { room: null, score: null, time: null },
+      pace: { metric: null, room: null, time: null, score: null }
+    };
     this.loadGuestProgress();
     this.updateChip();
   },
@@ -260,6 +300,25 @@ const Account = {
       .rpc('get_endless_rank', { p_metric: metric, p_user_id: this.user.id });
     if (error) {
       console.error('fetchMyRank error:', error);
+      return null;
+    }
+    return (data && data[0]) || null;
+  },
+
+  /* ---------------- public stats for one player (leaderboard tap) ---------------- */
+
+  // Everything shown in another player's stats modal: official-level
+  // bests/progress plus the full endless bests, including the pace
+  // room/time pair. Like fetchLeaderboard()/fetchMyRank(), this goes
+  // through a SECURITY DEFINER function rather than the "profiles"
+  // table directly, since that table's RLS only allows reading your
+  // own row - see the setup guide for the get_player_public_stats SQL.
+  async fetchPlayerStats(userId) {
+    if (!userId) return null;
+    const { data, error } = await supabaseClient
+      .rpc('get_player_public_stats', { p_user_id: userId });
+    if (error) {
+      console.error('fetchPlayerStats error:', error);
       return null;
     }
     return (data && data[0]) || null;
@@ -326,13 +385,28 @@ function setupAccountUI() {
       document.getElementById('stat-medium').textContent = getDifficultyBestLabel('medium');
       document.getElementById('stat-hard').textContent = getDifficultyBestLabel('hard');
 
-      document.getElementById('stat-endless-time').textContent =
-        game.endlessBest.time !== null && game.endlessBest.time !== undefined
-          ? formatTime(game.endlessBest.time) : '--';
-      document.getElementById('stat-endless-score').textContent =
-        game.endlessBest.score !== null ? game.endlessBest.score.toLocaleString() : '--';
-      document.getElementById('stat-endless-room').textContent =
-        game.endlessBest.room !== null ? game.endlessBest.room : '--';
+      const bestRun = game.endlessBest.run;
+      document.getElementById('stat-run-time').textContent =
+        bestRun.time !== null && bestRun.time !== undefined ? formatTime(bestRun.time) : '--';
+      document.getElementById('stat-run-score').textContent =
+        bestRun.score !== null && bestRun.score !== undefined ? bestRun.score.toLocaleString() : '--';
+      document.getElementById('stat-run-room').textContent =
+        bestRun.room !== null && bestRun.room !== undefined ? bestRun.room : '--';
+
+      const bestPace = game.endlessBest.pace;
+      document.getElementById('stat-pace-time').textContent =
+        bestPace.time !== null && bestPace.time !== undefined ? formatTime(bestPace.time) : '--';
+      document.getElementById('stat-pace-score').textContent =
+        bestPace.score !== null && bestPace.score !== undefined ? bestPace.score.toLocaleString() : '--';
+      document.getElementById('stat-pace-room').textContent =
+        bestPace.room !== null && bestPace.room !== undefined ? bestPace.room : '--';
+
+      document.getElementById('stat-best-room').textContent =
+        bestRun.room !== null && bestRun.room !== undefined ? bestRun.room : '--';
+      document.getElementById('stat-rooms-cleared').textContent =
+        game.lifetime.rooms.toLocaleString();
+      document.getElementById('stat-enemies-eliminated').textContent =
+        game.lifetime.enemies.toLocaleString();
     } else {
       guestView.classList.remove('hidden');
       profileView.classList.add('hidden');

@@ -1071,6 +1071,7 @@ body {
 .account-inner {
   width: 100%;
   max-width: 340px;
+  max-height: 100%;
 }
 
 #account-guest-view {
@@ -1197,6 +1198,14 @@ body {
   align-items: center;
   gap: 18px;
   width: 100%;
+  min-height: 0;        /* lets it shrink inside .account-inner and scroll */
+  overflow-y: auto;     /* scrolls with the mouse wheel / touch... */
+  scrollbar-width: none;            /* ...but with no visible scrollbar (Firefox) */
+  -ms-overflow-style: none;         /* (old Edge) */
+}
+
+#account-profile-view::-webkit-scrollbar {
+  display: none;                    /* (Chrome / Safari / new Edge) */
 }
 
 .profile-header {
@@ -1275,6 +1284,7 @@ body {
   font-weight: 700;
   letter-spacing: 1px;
   color: var(--text-muted);
+  text-align: center;
 }
 
 .stat-card-value {
@@ -1288,8 +1298,17 @@ body {
 
 /* ============ Endless leaderboard ============ */
 
+/* Same joined-pill look as .auth-tabs (login/signup) - just with a
+   bit more breathing room between the three tabs and around their
+   labels than the default auth-tabs gap/padding gives. */
 .leaderboard-tabs {
   margin-bottom: 4px;
+  gap: 14px;
+  padding: 6px;
+}
+
+.leaderboard-tabs .auth-tab {
+  padding: 9px 8px;
 }
 
 .leaderboard-list {
@@ -1333,6 +1352,16 @@ body {
   border: 1.5px solid var(--wall-border);
   background: rgba(16, 22, 31, 0.6);
   font-family: var(--mono);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+/* Rows are tappable - open that player's stats. */
+.leaderboard-row:hover,
+.leaderboard-row:focus-visible {
+  border-color: var(--player);
+  background: rgba(79, 216, 196, 0.08);
+  outline: none;
 }
 
 .leaderboard-rank {
@@ -1392,5 +1421,70 @@ body {
 }
 
 .logout-link:hover {
+  color: var(--fail);
+}
+
+/* ============ Player stats modal (from tapping a leaderboard row) ============ */
+
+/* Sits inside #game-wrapper, same footprint as .screen, but layered
+   above the leaderboard screen instead of replacing it - so it isn't
+   part of ALL_SCREENS / showScreen()'s full-screen swap. */
+#player-stats-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 8, 12, 0.82);
+  backdrop-filter: blur(3px);
+  padding: 16px;
+}
+
+#player-stats-modal.hidden {
+  display: none;
+}
+
+/* The stat sections inside the modal had no spacing between them (unlike
+   the account screen, which spaces them via its own flex gap). */
+#player-stats-body:not(.hidden) {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.player-stats-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: min(100%, 340px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 30px 24px 24px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1.5px solid var(--wall-border);
+  box-shadow: 0 0 0 1px var(--wall-border), 0 30px 80px -30px rgba(0, 0, 0, 0.8);
+}
+
+.modal-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-family: var(--mono);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 8px;
+  transition: color 0.15s ease;
+}
+
+.modal-close:hover {
   color: var(--fail);
 }

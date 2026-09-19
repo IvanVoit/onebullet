@@ -64,7 +64,7 @@
       </button>
       <div class="menu-inner">
         <div class="title-wrap">
-          <img src="images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
+          <img src="/images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
         </div>
         <p class="subtitle">One shot. No mistakes.</p>
 
@@ -297,19 +297,55 @@
           </div>
 
           <div class="stats-section">
-            <h3 class="stats-heading">ENDLESS MODE</h3>
+            <h3 class="stats-heading">BEST ENDLESS RUN</h3>
             <div class="stats-grid">
               <div class="stat-card">
-                <span class="stat-card-label">BEST TIME</span>
-                <span class="stat-card-value" id="stat-endless-time">--</span>
+                <span class="stat-card-label">TIME</span>
+                <span class="stat-card-value" id="stat-run-time">--</span>
               </div>
               <div class="stat-card">
-                <span class="stat-card-label">BEST SCORE</span>
-                <span class="stat-card-value" id="stat-endless-score">--</span>
+                <span class="stat-card-label">SCORE</span>
+                <span class="stat-card-value" id="stat-run-score">--</span>
               </div>
               <div class="stat-card">
-                <span class="stat-card-label">BEST ROOM</span>
-                <span class="stat-card-value" id="stat-endless-room">--</span>
+                <span class="stat-card-label">ROOM</span>
+                <span class="stat-card-value" id="stat-run-room">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">BEST PACE</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">TIME</span>
+                <span class="stat-card-value" id="stat-pace-time">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">SCORE</span>
+                <span class="stat-card-value" id="stat-pace-score">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ROOM</span>
+                <span class="stat-card-value" id="stat-pace-room">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">LIFETIME</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">BEST<br>ROOM</span>
+                <span class="stat-card-value" id="stat-best-room">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ROOMS<br>CLEARED</span>
+                <span class="stat-card-value" id="stat-rooms-cleared">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ENEMIES<br>ELIMINATED</span>
+                <span class="stat-card-value" id="stat-enemies-eliminated">--</span>
               </div>
             </div>
           </div>
@@ -339,6 +375,94 @@
         <div id="leaderboard-you-row" class="leaderboard-you-row hidden"></div>
 
         <button id="btn-leaderboard-back" class="btn btn-ghost">BACK</button>
+      </div>
+    </div>
+
+    <!-- ============ PLAYER STATS MODAL (tap a leaderboard row) ============ -->
+    <div id="player-stats-modal" class="hidden">
+      <div class="player-stats-panel">
+        <button id="btn-player-stats-close" class="modal-close" aria-label="Close">&times;</button>
+
+        <div class="profile-header">
+          <div class="profile-avatar" id="player-stats-avatar">?</div>
+          <div class="profile-username" id="player-stats-username">PLAYER</div>
+        </div>
+
+        <p id="player-stats-status" class="leaderboard-status hidden">LOADING&hellip;</p>
+
+        <div id="player-stats-body" class="hidden">
+          <div class="stats-section">
+            <h3 class="stats-heading">OFFICIAL LEVELS</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">EASY</span>
+                <span class="stat-card-value" id="player-stat-easy">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">MEDIUM</span>
+                <span class="stat-card-value" id="player-stat-medium">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">HARD</span>
+                <span class="stat-card-value" id="player-stat-hard">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">BEST ENDLESS RUN</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">TIME</span>
+                <span class="stat-card-value" id="player-stat-run-time">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">SCORE</span>
+                <span class="stat-card-value" id="player-stat-run-score">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ROOM</span>
+                <span class="stat-card-value" id="player-stat-run-room">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">BEST PACE</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">TIME</span>
+                <span class="stat-card-value" id="player-stat-pace-time">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">SCORE</span>
+                <span class="stat-card-value" id="player-stat-pace-score">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ROOM</span>
+                <span class="stat-card-value" id="player-stat-pace-room">--</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="stats-heading">LIFETIME</h3>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <span class="stat-card-label">BEST<br>ROOM</span>
+                <span class="stat-card-value" id="player-stat-best-room">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ROOMS<br>CLEARED</span>
+                <span class="stat-card-value" id="player-stat-rooms-cleared">--</span>
+              </div>
+              <div class="stat-card">
+                <span class="stat-card-label">ENEMIES<br>ELIMINATED</span>
+                <span class="stat-card-value" id="player-stat-enemies-eliminated">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
