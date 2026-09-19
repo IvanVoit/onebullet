@@ -202,6 +202,14 @@ const Account = {
     await supabaseClient.auth.signOut();
     this.user = null;
     this.profile = null;
+    // Reset in-memory progress first: loadGuestProgress() MERGES whatever
+    // it finds into `game`, and without this reset any pre-signup guest
+    // save left in localStorage would overwrite matching fields of the
+    // account's progress that was just showing, producing a confusing mix
+    // of old guest numbers and account numbers instead of a clean switch.
+    game.bestTimes = {};
+    game.bestProgress = { easy: null, medium: null, hard: null };
+    game.endlessBest = { room: null, score: null, time: null };
     this.loadGuestProgress();
     this.updateChip();
   },
@@ -349,8 +357,8 @@ function setupAccountUI() {
         }
         const result = await Account.signUp(username, email, password);
         if (!result.session) {
-          showError('Account created. Check your email to confirm it, then log in.');
-          tabs[0].click();
+          tabs[0].click(); // switch to the login tab...
+          showError('Account created. Check your email to confirm it, then log in.'); // ...then show the message, so resetForm() doesn't wipe it
           return;
         }
       } else {

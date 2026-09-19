@@ -101,6 +101,15 @@ function keyDisplayName(key) {
 let listeningForAction = null;
 
 function captureKeybind(action, key) {
+  // If another action already uses this key, swap them instead of letting
+  // two actions silently share one key (which made the second one stop
+  // working, since the keydown handler checks actions in a fixed order).
+  const conflictingAction = Object.keys(KEYBINDS).find(
+    (a) => a !== action && KEYBINDS[a] === key
+  );
+  if (conflictingAction) {
+    KEYBINDS[conflictingAction] = KEYBINDS[action];
+  }
   KEYBINDS[action] = key;
   saveKeybinds();
   listeningForAction = null;
@@ -571,6 +580,11 @@ function updateBullet(dt) {
         b.vy = reflected.vy;
 
         spawnImpactParticles(b.x, b.y, CONFIG.colors.bullet);
+        // Only resolve one wall per micro-step (matches the aim-line
+        // prediction in computePredictionPath) - without this, two walls
+        // close together could double-bounce the bullet within a single
+        // step, sending it somewhere the dotted guide never showed.
+        break;
       }
     }
 
@@ -1409,11 +1423,14 @@ function endRoom(victory) {
 
     // Track "how far you've gotten" on this difficulty, but only while
     // it's still uncompleted - once bestTimes exists the time takes over
-    // as the thing that's shown.
+    // as the thing that's shown. Capped one room short of the total: dying
+    // in the last room without clearing it should never read as "10/10",
+    // which would look identical to an actual completion.
     if (game.bestTimes[game.difficulty] === undefined) {
+      const cappedReachedRoom = Math.min(reachedRoom, game.levels.length - 1);
       const previousBestRoom = game.bestProgress[game.difficulty] || 0;
-      if (reachedRoom > previousBestRoom) {
-        game.bestProgress[game.difficulty] = reachedRoom;
+      if (cappedReachedRoom > previousBestRoom) {
+        game.bestProgress[game.difficulty] = cappedReachedRoom;
         if (typeof Account !== 'undefined') Account.syncProgress();
       }
     }
@@ -1439,7 +1456,7 @@ function getDifficultyBestLabel(difficulty) {
     return formatTime(game.bestTimes[difficulty]);
   }
   if (game.bestProgress[difficulty]) {
-    return `ROOM ${game.bestProgress[difficulty]} / ${LEVEL_SETS[difficulty].length}`;
+    return `${game.bestProgress[difficulty]} / ${LEVEL_SETS[difficulty].length}`;
   }
   return '--';
 }
