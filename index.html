@@ -26,6 +26,10 @@
         <span class="hud-label">SCORE</span>
         <span id="hud-score">0</span>
       </div>
+      <div class="hud-chip is-hidden" id="hud-streak-chip">
+        <span class="hud-label">STREAK</span>
+        <span id="hud-streak">x1.0</span>
+      </div>
       <div class="hud-chip" id="hud-enemies-chip">
         <span class="hud-label">ENEMIES</span>
         <span id="hud-enemies">3</span>
@@ -60,7 +64,7 @@
       </button>
       <div class="menu-inner">
         <div class="title-wrap">
-          <img src="images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
+          <img src="/images/onebulletlogo.png" alt="ONE BULLET" class="title-logo">
         </div>
         <p class="subtitle">One shot. No mistakes.</p>
 
@@ -320,7 +324,13 @@
     <!-- ============ ENDLESS LEADERBOARD ============ -->
     <div id="screen-leaderboard" class="screen hidden">
       <div class="menu-inner account-inner">
-        <h2 class="section-title">ENDLESS &middot; TOP 100</h2>
+        <h2 class="section-title">ENDLESS LEADERBOARD</h2>
+
+        <div class="auth-tabs leaderboard-tabs">
+          <button type="button" class="auth-tab active" data-metric="score">SCORE</button>
+          <button type="button" class="auth-tab" data-metric="room">ROOM</button>
+          <button type="button" class="auth-tab" data-metric="pace">PACE</button>
+        </div>
 
         <div id="leaderboard-list" class="leaderboard-list">
           <p class="leaderboard-status">LOADING&hellip;</p>

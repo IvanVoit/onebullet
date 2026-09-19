@@ -173,9 +173,13 @@ const game = {
   // spawns. The HUD clock (and score-relevant runTime) simply holds still
   // during this pause instead of continuing to tick.
   endlessTransitioning: false,
+  // Current streak of consecutive "fast" room clears (see
+  // ENDLESS_CONFIG.scoring.streakTimeThreshold) - drives the score
+  // multiplier. Resets to 0 on any slower clear, not on death.
+  endlessStreak: 0,
   // Kept around for future competitive features (best room / best score /
   // fastest clear / leaderboards). Only tracked in memory for now.
-  endlessBest: { room: null, score: null, time: null },
+  endlessBest: { room: null, score: null, time: null, paceScore: null, paceRoom: null, paceTime: null },
 
   lastTimestamp: 0
 };
@@ -888,6 +892,49 @@ function drawWall(wall) {
   ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
 }
 
+// Traces a rounded-rectangle path onto an existing ctx.beginPath(). Used
+// instead of the native ctx.roundRect() so this still works on older
+// browsers that don't support it.
+function roundedRectPath(context, x, y, w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2);
+  context.moveTo(x + rad, y);
+  context.arcTo(x + w, y, x + w, y + h, rad);
+  context.arcTo(x + w, y + h, x, y + h, rad);
+  context.arcTo(x, y + h, x, y, rad);
+  context.arcTo(x, y, x + w, y, rad);
+  context.closePath();
+}
+
+// The 4 border walls (see buildBorderWalls) used to each be drawn with
+// their own fillRect/strokeRect, which left a visible seam where the
+// outlines crossed at every corner. Drawing the whole frame as ONE
+// rounded "picture frame" shape (outer rect minus inner rect, evenodd
+// fill) removes the seams entirely and gives the arena softened corners
+// instead of hard 90° ones.
+function drawArenaFrame() {
+  const b = CONFIG.border;
+  const w = CONFIG.canvasWidth;
+  const h = CONFIG.canvasHeight;
+  // Square corners on purpose - matches every wall/obstacle in the game,
+  // and stays crisp even when blurred behind a menu overlay (a curve
+  // thin enough to blur can visually read as a gap; a straight miter
+  // join can't).
+  const cornerRadius = 0;
+
+  ctx.save();
+  ctx.beginPath();
+  roundedRectPath(ctx, 0, 0, w, h, cornerRadius);
+  roundedRectPath(ctx, b, b, w - b * 2, h - b * 2, cornerRadius);
+
+  ctx.fillStyle = CONFIG.colors.wall;
+  ctx.fill('evenodd');
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = CONFIG.colors.wallBorder;
+  ctx.stroke();
+  ctx.restore();
+}
+
 function drawParticles() {
   for (const particle of game.particles) {
     const alpha = 1 - particle.age / particle.life;
@@ -920,7 +967,11 @@ function drawPredictionLine() {
 function render() {
   drawBackground();
 
-  for (const wall of game.walls) drawWall(wall);
+  drawArenaFrame();
+  for (const wall of game.walls) {
+    if (wall.isBorder) continue;
+    drawWall(wall);
+  }
 
   drawPredictionLine();
 
@@ -969,6 +1020,8 @@ const ui = {
   hudRunTime: document.getElementById('hud-run-time'),
   hudScoreChip: document.getElementById('hud-score-chip'),
   hudScore: document.getElementById('hud-score'),
+  hudStreakChip: document.getElementById('hud-streak-chip'),
+  hudStreak: document.getElementById('hud-streak'),
 
   endlessOverRoom: document.getElementById('endless-over-room'),
   endlessOverScore: document.getElementById('endless-over-score'),
@@ -1056,6 +1109,19 @@ function updateHudScore() {
   ui.hudScore.textContent = game.endlessScore.toLocaleString();
 }
 
+// Shows the current streak multiplier once it's above x1.0, hides it
+// otherwise (streak 0 = no bonus, nothing to show).
+function updateHudStreak() {
+  if (game.endlessStreak <= 0) {
+    ui.hudStreakChip.classList.add('is-hidden');
+    return;
+  }
+  const s = ENDLESS_CONFIG.scoring;
+  const multiplier = 1 + Math.min(s.streakBonusCap, game.endlessStreak * s.streakBonusPerLevel);
+  ui.hudStreak.textContent = `x${multiplier.toFixed(1)}`;
+  ui.hudStreakChip.classList.remove('is-hidden');
+}
+
 function updateHudEnemyCount() {
   ui.hudEnemies.textContent = game.enemies.length;
 }
@@ -1140,6 +1206,8 @@ function renderControlsScreen() {
 
 /* ---------- Endless leaderboard ---------- */
 
+let leaderboardMetric = 'score'; // 'score' | 'room' | 'pace'
+
 // Minimal HTML escaping for anything built from a username - it's
 // constrained to [a-zA-Z0-9_] at signup, but this stays safe even if
 // that ever changes or a row comes from elsewhere.
@@ -1149,14 +1217,31 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// The value column reads differently per metric: a plain number for
+// score, "ROOM 50" for room, and "ROOM 50 - 1:36" for pace (showing the
+// actual room/time pair a ratio was computed from, not just the ratio,
+// per the design discussion - a bare number is meaningless on its own).
+function formatLeaderboardValue(entry) {
+  if (leaderboardMetric === 'room') {
+    return `ROOM ${entry.endless_best_room ?? '--'}`;
+  }
+  if (leaderboardMetric === 'pace') {
+    const room = entry.endless_best_pace_room;
+    const time = entry.endless_best_pace_time;
+    if (room == null || time == null) return '--';
+    return `ROOM ${room} \u00b7 ${formatTime(time)}`;
+  }
+  const score = entry.endless_best_score;
+  return score != null ? score.toLocaleString() : '0';
+}
+
 function buildLeaderboardRow(entry, isPinned) {
   const el = document.createElement('div');
   el.className = 'leaderboard-row' + (isPinned ? ' is-pinned' : '');
-  const score = entry.endless_best_score != null ? entry.endless_best_score.toLocaleString() : '0';
   el.innerHTML = `
     <span class="leaderboard-rank">#${entry.rank}</span>
     <span class="leaderboard-name">${escapeHtml(entry.username || 'PLAYER')}</span>
-    <span class="leaderboard-score">${score}</span>
+    <span class="leaderboard-score">${formatLeaderboardValue(entry)}</span>
   `;
   return el;
 }
@@ -1169,7 +1254,7 @@ async function renderLeaderboard() {
   if (typeof Account === 'undefined') return;
 
   const myId = Account.user ? Account.user.id : null;
-  const top = await Account.fetchLeaderboard(100);
+  const top = await Account.fetchLeaderboard(leaderboardMetric, 100);
 
   if (!top.length) {
     ui.leaderboardList.innerHTML = '<p class="leaderboard-status">NO SCORES YET - BE THE FIRST</p>';
@@ -1198,7 +1283,7 @@ async function renderLeaderboard() {
   // get_endless_rank() and pin it below the list instead of leaving them
   // wondering where they stand.
   if (myId) {
-    const mine = await Account.fetchMyRank();
+    const mine = await Account.fetchMyRank(leaderboardMetric);
     if (mine) {
       const row = buildLeaderboardRow(mine, true);
       row.classList.add('is-me');
@@ -1206,6 +1291,14 @@ async function renderLeaderboard() {
       ui.leaderboardYouRow.classList.remove('hidden');
     }
   }
+}
+
+function setLeaderboardMetric(metric) {
+  leaderboardMetric = metric;
+  document.querySelectorAll('.leaderboard-tabs .auth-tab').forEach((tab) => {
+    tab.classList.toggle('active', tab.dataset.metric === metric);
+  });
+  renderLeaderboard();
 }
 
 function goToLeaderboard() {
@@ -1314,6 +1407,10 @@ function setupUIListeners() {
   ui.btnLeaderboardBack.addEventListener('click', () => {
     game.state = STATE.MENU;
     showScreen(ui.screenMenu);
+  });
+
+  document.querySelectorAll('.leaderboard-tabs .auth-tab').forEach((tab) => {
+    tab.addEventListener('click', () => setLeaderboardMetric(tab.dataset.metric));
   });
 
   ui.btnSettings.addEventListener('click', goToSettings);
@@ -1445,11 +1542,14 @@ function buildBorderWalls() {
   const b = CONFIG.border;
   const w = CONFIG.canvasWidth;
   const h = CONFIG.canvasHeight;
+  // isBorder marks these so render() can skip the per-wall stroke and
+  // draw the whole frame as one seamless shape instead (see drawArenaFrame).
+  // Collision code only ever reads x/y/w/h, so this extra flag is safe.
   return [
-    { x: 0, y: 0, w: w, h: b },           // top
-    { x: 0, y: h - b, w: w, h: b },       // bottom
-    { x: 0, y: 0, w: b, h: h },           // left
-    { x: w - b, y: 0, w: b, h: h }        // right
+    { x: 0, y: 0, w: w, h: b, isBorder: true },           // top
+    { x: 0, y: h - b, w: w, h: b, isBorder: true },       // bottom
+    { x: 0, y: 0, w: b, h: h, isBorder: true },           // left
+    { x: w - b, y: 0, w: b, h: h, isBorder: true }        // right
   ];
 }
 
@@ -1609,9 +1709,11 @@ function returnToMenu() {
   game.endless = false;
   game.endlessRoom = 1;
   game.endlessScore = 0;
+  game.endlessStreak = 0;
   game.endlessTransitioning = false;
   clearTimeout(nextEndlessRoomTimer);
   ui.hudScoreChip.classList.add('is-hidden');
+  ui.hudStreakChip.classList.add('is-hidden');
 
   ui.hud.classList.add('hidden');
   ui.timerDisplay.classList.add('hidden');
@@ -1717,7 +1819,20 @@ const ENDLESS_CONFIG = {
     roomBonusPerRoom: 15,
     // Floor on the divisor so an implausibly-fast clear (or a 0/near-0
     // edge case) can't blow the score up towards infinity.
-    minClearTime: 0.25
+    minClearTime: 0.25,
+
+    // --- Streak / combo ---
+    // Clearing a room in under this many seconds counts as a "fast"
+    // clear and extends the streak; anything slower resets it to 0
+    // (the run itself is unaffected - this only costs the multiplier).
+    streakTimeThreshold: 3,
+    streakBonusPerLevel: 0.1,   // +10% score per streak level...
+    streakBonusCap: 1.0,        // ...capped at +100% (x2.0 total)
+
+    // --- Pace ("how far, how fast") ---
+    // room^paceExponent / totalTime. Squaring the room number makes
+    // depth dominate pure speed - see the PACE leaderboard.
+    paceExponent: 2
   }
 };
 
@@ -1859,11 +1974,24 @@ function pickEndlessPlayerStart(origin, walls, minDist, maxDist, enemies) {
 // (in seconds) so faster clears are worth more - e.g. a 300-point room
 // cleared in 3s scores 100. Floored to a whole number, and the divisor is
 // clamped so a near-instant clear can't send the score to infinity.
-function endlessRoomScore(roomNumber, enemyCount, clearTimeSeconds) {
+// streakMultiplier (see the streak block in ENDLESS_CONFIG.scoring) is
+// applied on top: consecutive fast clears are worth progressively more.
+function endlessRoomScore(roomNumber, enemyCount, clearTimeSeconds, streakMultiplier) {
   const s = ENDLESS_CONFIG.scoring;
   const base = enemyCount * s.perEnemy + s.roomBonusBase + roomNumber * s.roomBonusPerRoom;
   const divisor = Math.max(clearTimeSeconds, s.minClearTime);
-  return Math.floor(base / divisor);
+  return Math.floor((base / divisor) * streakMultiplier);
+}
+
+// "How far, how fast" in a single number: room reached squared, divided
+// by total run time. Squaring the room count is deliberate - it means
+// reaching further always outweighs a lucky early stop (room 5 in 2s
+// scores 5*5/2=12.5, room 50 in 96s scores 50*50/96=26 - depth wins),
+// while still rewarding a fast, sustained run more than a slow one.
+function endlessPaceScore(roomsReached, totalTimeSeconds) {
+  const s = ENDLESS_CONFIG.scoring;
+  const divisor = Math.max(totalTimeSeconds, s.minClearTime);
+  return Math.pow(roomsReached, s.paceExponent) / divisor;
 }
 
 // Simulates a full bullet flight from (startX, startY) at `angle`, against
@@ -2030,6 +2158,7 @@ function startEndlessRun() {
   game.endless = true;
   game.endlessRoom = 1;
   game.endlessScore = 0;
+  game.endlessStreak = 0;
   game.runTime = 0;
   game.lastRoomTime = 0;
   game.endlessTransitioning = false;
@@ -2037,6 +2166,7 @@ function startEndlessRun() {
 
   ui.hudRunLabel.textContent = 'TIME';
   ui.hudScoreChip.classList.remove('is-hidden');
+  ui.hudStreakChip.classList.add('is-hidden');
   updateHudScore();
 
   startEndlessRoom(game.endlessRoom);
@@ -2082,8 +2212,19 @@ function endEndlessRoom(victory) {
     if (game.bullet) game.bullet.active = false;
     updateHudBulletStatus();
 
-    game.endlessScore += endlessRoomScore(game.endlessRoom, game.endlessRoomEnemyCount, game.lastRoomTime);
+    // Streak: a fast clear extends it (and the score multiplier grows
+    // with it); anything at/above the threshold resets it to 0. Either
+    // way the run itself continues - this only costs next room's bonus.
+    const wasFast = game.lastRoomTime < ENDLESS_CONFIG.scoring.streakTimeThreshold;
+    game.endlessStreak = wasFast ? game.endlessStreak + 1 : 0;
+    const streakMultiplier = 1 + Math.min(
+      ENDLESS_CONFIG.scoring.streakBonusCap,
+      game.endlessStreak * ENDLESS_CONFIG.scoring.streakBonusPerLevel
+    );
+
+    game.endlessScore += endlessRoomScore(game.endlessRoom, game.endlessRoomEnemyCount, game.lastRoomTime, streakMultiplier);
     updateHudScore();
+    updateHudStreak();
     game.endlessRoom++;
 
     // Brief pause so the last kill reads before the next room appears. The
@@ -2106,10 +2247,17 @@ function endEndlessRoom(victory) {
   const isNewBestRoom = game.endlessBest.room === null || reachedRoom > game.endlessBest.room;
   const isNewBestScore = game.endlessBest.score === null || game.endlessScore > game.endlessBest.score;
   const isNewBestTime = game.endlessBest.time === null || game.runTime > game.endlessBest.time;
+  const paceScore = endlessPaceScore(reachedRoom, game.runTime);
+  const isNewBestPace = game.endlessBest.paceScore === null || paceScore > game.endlessBest.paceScore;
   if (isNewBestRoom) game.endlessBest.room = reachedRoom;
   if (isNewBestScore) game.endlessBest.score = game.endlessScore;
   if (isNewBestTime) game.endlessBest.time = game.runTime;
-  if ((isNewBestRoom || isNewBestScore || isNewBestTime) && typeof Account !== 'undefined') Account.syncProgress();
+  if (isNewBestPace) {
+    game.endlessBest.paceScore = paceScore;
+    game.endlessBest.paceRoom = reachedRoom;
+    game.endlessBest.paceTime = game.runTime;
+  }
+  if ((isNewBestRoom || isNewBestScore || isNewBestTime || isNewBestPace) && typeof Account !== 'undefined') Account.syncProgress();
 
   ui.endlessOverRoom.textContent = `${reachedRoom}`;
   ui.endlessOverScore.textContent = game.endlessScore.toLocaleString();

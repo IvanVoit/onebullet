@@ -21,6 +21,27 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* iOS: suppress the press-and-hold copy menu */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Form fields inside the account screen are the one place typing/selecting
+   text is actually needed - undo the blanket rule above just for those. */
+input, textarea {
+  -webkit-user-select: text;
+  -moz-user-select: text;
+  -ms-user-select: text;
+  user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
 }
 
 .hidden {
@@ -1267,6 +1288,10 @@ body {
 
 /* ============ Endless leaderboard ============ */
 
+.leaderboard-tabs {
+  margin-bottom: 4px;
+}
+
 .leaderboard-list {
   display: flex;
   flex-direction: column;
@@ -1274,7 +1299,7 @@ body {
   width: 100%;
   max-height: 42vh;
   overflow-y: auto;
-  padding: 4px 6px 4px 0;
+  padding: 4px 8px;
 }
 
 .leaderboard-list::-webkit-scrollbar { width: 6px; }

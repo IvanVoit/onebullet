@@ -96,6 +96,11 @@ const Account = {
     if (data.endless_best_time !== null && data.endless_best_time !== undefined) {
       game.endlessBest.time = data.endless_best_time;
     }
+    if (data.endless_best_pace_score !== null && data.endless_best_pace_score !== undefined) {
+      game.endlessBest.paceScore = data.endless_best_pace_score;
+      game.endlessBest.paceRoom = data.endless_best_pace_room;
+      game.endlessBest.paceTime = data.endless_best_pace_time;
+    }
     if (data.best_progress && typeof data.best_progress === 'object') {
       game.bestProgress = { ...game.bestProgress, ...data.best_progress };
     }
@@ -116,6 +121,9 @@ const Account = {
       endless_best_room: game.endlessBest.room,
       endless_best_score: game.endlessBest.score,
       endless_best_time: game.endlessBest.time,
+      endless_best_pace_score: game.endlessBest.paceScore,
+      endless_best_pace_room: game.endlessBest.paceRoom,
+      endless_best_pace_time: game.endlessBest.paceTime,
       best_progress: game.bestProgress,
       updated_at: new Date().toISOString()
     };
@@ -227,14 +235,15 @@ const Account = {
 
   /* ---------------- endless leaderboard ---------------- */
 
-  // Top N players by endless_best_score, via the get_endless_leaderboard()
-  // SQL function (SECURITY DEFINER - see setup guide). This intentionally
-  // does NOT read the "profiles" table directly: that table is RLS-locked
-  // to each user's own row, and the function is the only thing allowed to
-  // hand out other players' username/score/room/time publicly.
-  async fetchLeaderboard(limit = 100) {
+  // Top N players for a given metric ('score' | 'room' | 'pace'), via the
+  // get_endless_leaderboard() SQL function (SECURITY DEFINER - see setup
+  // guide). This intentionally does NOT read the "profiles" table
+  // directly: that table is RLS-locked to each user's own row, and the
+  // function is the only thing allowed to hand out other players'
+  // username/stats publicly.
+  async fetchLeaderboard(metric = 'score', limit = 100) {
     const { data, error } = await supabaseClient
-      .rpc('get_endless_leaderboard', { p_limit: limit });
+      .rpc('get_endless_leaderboard', { p_metric: metric, p_limit: limit });
     if (error) {
       console.error('fetchLeaderboard error:', error);
       return [];
@@ -242,12 +251,13 @@ const Account = {
     return data || [];
   },
 
-  // Current user's rank + stats even when they fall outside the top N.
-  // Guests have no cloud save, so there is nothing to rank - null.
-  async fetchMyRank() {
+  // Current user's rank + stats for that same metric, even when they fall
+  // outside the top N. Guests have no cloud save, so there is nothing to
+  // rank - null.
+  async fetchMyRank(metric = 'score') {
     if (!this.user) return null;
     const { data, error } = await supabaseClient
-      .rpc('get_endless_rank', { p_user_id: this.user.id });
+      .rpc('get_endless_rank', { p_metric: metric, p_user_id: this.user.id });
     if (error) {
       console.error('fetchMyRank error:', error);
       return null;
